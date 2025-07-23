@@ -1,0 +1,84 @@
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    container_name: keycloak
+    ports:
+      - "8080:8080"
+      - "8443:8443"
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      DB_VENDOR: h2
+      KC_HOSTNAME_STRICT_HTTPS: false
+      KC_HOSTNAME: keycloak
+      KC_HTTP_PORT: 8080
+      KC_HTTP_ENABLED: true
+    command: start-dev
+    networks:
+      - sisint-network
+    volumes:
+      - keycloak_data:/opt/keycloak/data
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    networks:
+      - sisint-network
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    restart: unless-stopped
+
+  auth-service:
+    build:
+      context: ./src/SisInt.Backend.AuthService
+      dockerfile: Dockerfile
+    container_name: auth-service
+    ports:
+      - "5000:80"
+      - "5001:443"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      Keycloak__Authority: http://keycloak:8080/realms/sisint-realm
+      Keycloak__Audience: sisint-auth-service
+      RabbitMQ__HostName: rabbitmq
+      RabbitMQ__UserName: guest
+      RabbitMQ__Password: guest
+    depends_on:
+      keycloak:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
+    networks:
+      - sisint-network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./src/SisInt.Frontend
+      dockerfile: Dockerfile
+    container_name: frontend
+    ports:
+      - "5173:80"
+    environment:
+      VITE_AUTH_SERVICE_URL: http://localhost:5000
+    depends_on:
+      auth-service:
+        condition: service_started
+    networks:
+      - sisint-network
+    restart: unless-stopped
+
+volumes:
+  keycloak_data:
+  rabbitmq_data:
+
+networks:
+  sisint-network:
+    driver: bridge

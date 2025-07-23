@@ -1,0 +1,16 @@
+@SisInt.Backend.AuthService_HostAddress = http://localhost:5000
+
+GET {{SisInt.Backend.AuthService_HostAddress}}/TestAuth/public
+Accept: application/json
+
+###
+@name getToken
+POST http://localhost:8080/realms/sisint-realm/protocol/openid-connect/token
+Content-Type: application/x-www-form-urlencoded
+
+client_id=sisint-auth-service&grant_type=password&username=admin&password=@dm1N&client_secret=ylpwaJVLL0Ya3VeoSHtfPQUhVDbsy2F2
+
+###
+GET {{SisInt.Backend.AuthService_HostAddress}}/TestAuth
+Authorization: Bearer {{getToken.response.body.access_token}}
+Accept: application/json

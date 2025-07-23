@@ -1,0 +1,1161 @@
+﻿2.5. Migrações e Criação do Banco de Dados
+Agora que o DbContext e a string de conexão estão configurados, você pode criar as migrações e aplicá-las ao seu SQL Server LocalDB.
+
+Abra o Console do Gerenciador de Pacotes no Visual Studio (ou o terminal na pasta src\SisInt.Backend.AuthService) e execute os comandos:
+
+Criar a primeira migração:
+
+PowerShell
+
+Add-Migration InitialCreate
+(ou dotnet ef migrations add InitialCreate no CLI)
+
+Isso criará uma pasta Migrations no seu projeto SisInt.Backend.AuthService com o código para criar as tabelas com base nas suas classes de modelo.
+
+Aplicar a migração ao banco de dados:
+
+PowerShell
+
+Update-Database
+(ou dotnet ef database update no CLI)
+
+Este comando criará o banco de dados SisInt (se não existir) no seu SQL Server LocalDB e as tabelas correspondentes.
+
+Você pode verificar a criação das tabelas abrindo o SQL Server Management Studio (SSMS) e conectando-se à sua instância do LocalDB.
+
+3. Criação de Endpoints da API no AuthService
+Vamos criar alguns endpoints para gerenciar usuários e perfis, interagindo com o banco de dados local.
+
+3.1. Controller para Usuários (Exemplo)
+Crie um novo controlador UsuarioController.cs na pasta Controllers.
+
+src\SisInt.Backend.AuthService\Controllers\UsuarioController.cs
+
+C#
+
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using SisInt.Backend.AuthService.Data;
+using SisInt.Backend.AuthService.Models;
+using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
+
+namespace SisInt.Backend.AuthService.Controllers
+{
+    [ApiController]
+    [Route("api/[controller]")]
+    [Authorize] // Todos os endpoints aqui exigem autenticação por padrão
+    public class UsuarioController : ControllerBase
+    {
+        private readonly ApplicationDbContext _context;
+
+        public UsuarioController(ApplicationDbContext context)
+        {
+            _context = context;
+        }
+
+        /// <summary>
+        /// Obtém todos os usuários registrados localmente.
+        /// </summary>
+        /// <remarks>
+        /// Requer a role 'admin'.
+        /// </remarks>
+        [HttpGet]
+        [Authorize(Roles = "admin")] // Exige a role 'admin'
+        public async Task<ActionResult<IEnumerable<Usuario>>> GetUsuarios()
+        {
+            return Ok(await _context.Usuarios.ToListAsync());
+        }
+
+        /// <summary>
+        /// Obtém um usuário específico por ID.
+        /// </summary>
+        /// <param name="id">ID do usuário (Guid).</param>
+        /// <remarks>
+        /// Requer a role 'admin' ou ser o próprio usuário.
+        /// </remarks>
+        [HttpGet("{id}")]
+        [Authorize(Roles = "admin, user")] // Permite 'admin' ou 'user'
+        public async Task<ActionResult<Usuario>> GetUsuario(Guid id)
+        {
+            var userIdClaim = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
+            if (User.IsInRole("admin") || (userIdClaim != null && new Guid(userIdClaim) == id))
+            {
+                var usuario = await _context.Usuarios.FindAsync(id);
+
+                if (usuario == null)
+                {
+                    return NotFound();
+                }
+
+                return Ok(usuario);
+            }
+            return Forbid(); // Usuário não autorizado
+        }
+
+        /// <summary>
+        /// Registra um novo usuário no banco de dados local.
+        /// </summary>
+        /// <remarks>
+        /// Este endpoint pode ser usado para sincronizar usuários do Keycloak para o banco de dados local,
+        /// ou para registrar usuários que não são inicialmente gerenciados pelo Keycloak, mas exigem
+        /// uma entrada no banco de dados do SisInt.
+        /// Requer a role 'admin'.
+        /// </remarks>
+        [HttpPost]
+        [AllowAnonymous] // Pode ser acessado sem autenticação inicial (para registro público, por exemplo)
+                         // Ou [Authorize(Roles = "admin")] se o registro for restrito.
+        public async Task<ActionResult<Usuario>> RegisterUsuario([FromBody] UsuarioRegisterDto usuarioDto)
+        {
+            if (await _context.Usuarios.AnyAsync(u => u.Email == usuarioDto.Email))
+            {
+                return Conflict("Um usuário com este email já existe.");
+            }
+            
+            // Gerar um novo Guid para o ID do usuário local, ou usar o ID do Keycloak se disponível
+            // Por simplicidade, geramos um novo aqui. Em um cenário real, você pode querer
+            // vincular ao ID do usuário no Keycloak.
+            var novoUsuario = new Usuario
+            {
+                Id = Guid.NewGuid(), // Ou usuarioDto.KeycloakId se estiver sincronizando
+                Username = usuarioDto.Username,
+                Email = usuarioDto.Email,
+                EmailConfirmado = false, // Em um cenário real, isso viria do Keycloak ou de um processo de verificação
+                DataCriacao = DateTime.UtcNow
+            };
+
+            _context.Usuarios.Add(novoUsuario);
+            await _context.SaveChangesAsync();
+
+            // Log de acesso (opcional, pode ser feito por um serviço de mensageria)
+            _context.LogAcessos.Add(new LogAcesso
+            {
+                UsuarioId = novoUsuario.Id,
+                DataAcesso = DateTime.UtcNow,
+                IPOrigem = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "N/A",
+                Detalhes = $"Usuário {novoUsuario.Username} registrado localmente."
+            });
+            await _context.SaveChangesAsync();
+
+            return CreatedAtAction(nameof(GetUsuario), new { id = novoUsuario.Id }, novoUsuario);
+        }
+
+        // DTO para registro de usuário
+        public class UsuarioRegisterDto
+        {
+            [Required]
+            public string Username { get; set; }
+            [Required]
+            [EmailAddress]
+            public string Email { get; set; }
+            // Opcional: Se você quiser vincular o ID do Keycloak diretamente
+            // public Guid? KeycloakId { get; set; } 
+        }
+    }
+}
+3.2. Implementar Autorização Baseada em Roles/Permissões
+Você já tem a configuração básica do JwtBearer para autenticação com o Keycloak. Para usar a autorização baseada em roles, o Keycloak precisa incluir as roles no token JWT.
+
+No Keycloak:
+
+Criar Roles: Acesse a interface de administração do Keycloak (http://keycloak:8080/). Faça login com admin/admin.
+
+Navegue até o realm sisint-realm.
+
+Vá para Roles (Papéis).
+
+Crie uma nova role, por exemplo, admin. Você pode criar outras roles como user, manager, etc.
+
+Vá para Users (Usuários).
+
+Selecione o usuário admin (ou crie um novo).
+
+Vá para a aba Role Mappings (Mapeamento de Papéis).
+
+Em "Available Roles" (Papéis Disponíveis), selecione a role admin e adicione-a às "Assigned Roles" (Papéis Atribuídos).
+
+Repita para outras roles e usuários conforme necessário.
+
+No AuthService (Código):
+
+O EF Core e o .NET já entendem a anotação [Authorize(Roles = "nome_da_role")]. O JwtBearer padrão do .NET já mapeia as roles do Keycloak (que vêm na claim realm_access.roles ou resource_access.<client_id>.roles no JWT) para as roles que o [Authorize] pode usar.
+
+Se a sua claim de role não estiver sendo mapeada corretamente, você pode personalizar o mapeamento no Program.cs. No seu caso, o Keycloak geralmente envia as roles como realm_access.roles. O .NET mapeia isso automaticamente. No entanto, se precisar de mapeamento específico, você pode adicionar no AddJwtBearer as opções:
+
+C#
+
+.AddJwtBearer(options =>
+{
+    // ... suas configurações existentes ...
+
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        // ...
+        NameClaimType = "preferred_username", // ou "name"
+        RoleClaimType = "realm_access.roles" // Ou "resource_access.<client_id>.roles" se estiver usando roles de cliente
+    };
+    // ...
+});
+Importante: Verifique o conteúdo do token JWT emitido pelo Keycloak (você pode decodificá-lo em jwt.io) para confirmar como as roles estão sendo enviadas (geralmente em realm_access.roles ou resource_access). Se forem resource_access.<client_id>.roles, você precisará ajustar o RoleClaimType para resource_access.<seu_client_id>.roles.
+
+O exemplo de UsuarioController já demonstra o uso de [Authorize(Roles = "admin")] e [Authorize(Roles = "admin, user")].
+
+4. Executando e Testando
+Reconstrua a imagem Docker do AuthService:
+Como você adicionou novos pacotes NuGet e alterou o código, você precisa reconstruir a imagem Docker do auth-service. Vá para a pasta raiz do seu projeto C:\Projetos\GitHub\SisInt\ e execute:
+
+Bash
+
+docker compose build auth-service
+Inicie os contêineres Docker:
+
+Bash
+
+docker compose up -d
+Verifique se o banco de dados foi criado:
+Abra o SQL Server Management Studio (SSMS) e conecte-se à sua instância (LocalDB)\MSSQLLocalDB. Verifique se o banco de dados SisInt e as tabelas (Usuarios, Perfis, Permissoes, etc.) foram criados.
+
+Testar os Endpoints com Postman (ou SisInt.Backend.AuthService.http):
+
+Registro de Usuário (Sem Autenticação, se [AllowAnonymous]):
+Use o POST para http://localhost:5000/api/Usuario com um corpo JSON:
+
+JSON
+
+{
+    "username": "novo.usuario",
+    "email": "novo.usuario@sisint.com"
+}
+Você deve receber um 201 Created e os detalhes do novo usuário.
+
+Obter um token JWT do Keycloak (se ainda não tiver):
+No seu arquivo SisInt.Backend.AuthService.http, você já tem a requisição:
+
+HTTP
+
+POST http://localhost:8080/realms/sisint-realm/protocol/openid-connect/token
+Content-Type: application/x-www-form-urlencoded
+
+client_id=sisint-auth-service&grant_type=password&username=admin&password=@dm1N&client_secret=ylpwaJVLL0Ya3VeoSHtfPQUhVDbsy2F2
+Execute esta requisição para obter um token Bearer. Copie o access_token.
+
+Acessar Endpoint Protegido com Role "admin":
+Use GET para http://localhost:5000/api/Usuario.
+No cabeçalho Authorization, adicione Bearer [seu_token_aqui].
+Se o token do usuário admin tiver a role admin, você deverá ver a lista de usuários. Se não, receberá 403 Forbidden.
+
+Acessar Endpoint Protegido sem Role (ou com role diferente):
+Tente acessar http://localhost:5000/api/Usuario com um token que não tenha a role admin. Você deve receber 403 Forbidden.
+-
+
+
+Análise e Sugestões para as Próximas Etapas 🚀
+1. Configuração do DbContext no Program.cs
+A adição do DbContext e a aplicação automática das migrações (dbContext.Database.Migrate();) no Program.cs estão corretas para o ambiente de desenvolvimento. Essa abordagem é super conveniente para agilizar o ciclo de feedback durante o desenvolvimento, já que você não precisa executar Update-Database manualmente a cada alteração de modelo.
+
+Críticas/Sugestões:
+
+dbContext.Database.Migrate() em Produção: Embora seja excelente para desenvolvimento, aplicar migrações automaticamente no startup em ambientes de produção não é uma prática recomendada. Em produção, você geralmente quer ter mais controle sobre o processo de aplicação das migrações, talvez com ferramentas de CI/CD ou scripts dedicados, para evitar interrupções no serviço ou problemas inesperados em larga escala. No entanto, para o seu escopo de desenvolvimento atual, está perfeito.
+
+Tratamento de Erros no Migrate(): Em um cenário mais robusto (mesmo para desenvolvimento), é bom adicionar um bloco try-catch ao redor do dbContext.Database.Migrate(); para lidar com possíveis falhas na migração de forma mais graciosa, logando o erro em vez de deixar a aplicação crashar.
+
+2. Migrações e Criação do Banco de Dados
+Os comandos Add-Migration InitialCreate e Update-Database são os padrões do Entity Framework Core e estão corretíssimos.
+
+Críticas/Sugestões:
+
+Verificação no SSMS: A sugestão de verificar as tabelas no SSMS é uma ótima etapa de validação. Confirme se as tabelas e suas chaves estrangeiras/primárias compostas (UsuarioPerfil, PermissaoPerfil) foram criadas conforme esperado.
+
+3. Criação de Endpoints da API no AuthService (UsuarioController.cs) 🧑‍💻
+A implementação do UsuarioController é um passo crucial e demonstra um bom entendimento de APIs RESTful e autorização com .NET.
+
+Críticas/Sugestões:
+
+Duplicação de Dados do Usuário (Usuario Model): Este é o ponto mais crítico, como mencionei anteriormente, mas agora com a implementação em mente.
+
+O seu UsuarioController permite registrar e consultar usuários em um banco de dados local (SisInt.Backend.AuthService.Data.ApplicationDbContext).
+
+No entanto, você está usando o Keycloak como provedor de autenticação, que já gerencia usuários.
+
+Problema: Se um usuário se registra no Keycloak, ele não aparecerá automaticamente na sua tabela Usuarios local. Se ele se registra via seu RegisterUsuario (com [AllowAnonymous]), ele não aparecerá no Keycloak. Isso cria uma inconsistência séria na fonte da verdade para os dados do usuário.
+
+Sugestão Essencial:
+
+Decida: Onde está a fonte primária dos dados do usuário?
+
+Se Keycloak for a fonte primária: A tabela Usuario no seu banco de dados local deve servir apenas para armazenar informações complementares ao usuário do Keycloak que sejam específicas da sua aplicação (ex: preferências, configurações de notificação). Você precisaria de um mecanismo para sincronizar o ID (sub) do usuário do Keycloak com um campo no seu modelo Usuario local, e não ter um Id = Guid.NewGuid() aleatório. O endpoint RegisterUsuario se tornaria um endpoint para "criar perfil complementar" após o usuário ser criado no Keycloak ou para registrar um usuário no Keycloak e depois no seu DB.
+
+Se seu DB local for a fonte primária (menos comum com Keycloak): Então o Keycloak seria apenas para SSO. Mas isso contradiz a arquitetura comum de usar um IAM como Keycloak.
+
+Ação Imediata para Desenvolvimento: Por simplicidade no desenvolvimento, se a ideia é ter usuários no seu DB local para o seu sistema de permissões, você precisa de uma forma de criar/sincronizar usuários do Keycloak para o seu DB local, ou remover o [AllowAnonymous] do RegisterUsuario e fazer com que ele só possa ser chamado por um "admin" que já exista no Keycloak e esteja sincronizando usuários.
+
+Considerando que você tem UsuarioPerfil, Perfil, Permissao, a sua intenção é gerenciar a autorização (quem pode acessar o quê) no seu DB local, o que é uma prática comum. O ponto de fricção é a tabela Usuario duplicada.
+
+RegisterUsuario Endpoint ([AllowAnonymous] vs. [Authorize(Roles = "admin")]):
+
+Você colocou um comentário sobre a opção de [AllowAnonymous] ou [Authorize(Roles = "admin")].
+
+Sugestão: Para um serviço de autenticação que usa Keycloak, o registro de novos usuários geralmente é feito no Keycloak. O RegisterUsuario na sua API deveria, na maioria dos cenários, ser um endpoint protegido por [Authorize(Roles = "admin")] para que apenas administradores possam criar entradas de usuário no seu banco de dados local, possivelmente vinculando-as a IDs de usuários existentes no Keycloak. Se você quer um registro público, ele deveria interagir diretamente com a API de registro do Keycloak, e então, um webhook do Keycloak (ou um processo de sincronização) criaria a entrada correspondente no seu banco de dados local.
+
+Validação de Autorização no GetUsuario(Guid id):
+
+A lógica if (User.IsInRole("admin") || (userIdClaim != null && new Guid(userIdClaim) == id)) é correta e robusta para permitir que um admin veja qualquer usuário ou que um usuário veja seus próprios dados. Ponto positivo!
+
+DTOs: A criação de um DTO (UsuarioRegisterDto) para o registro é uma boa prática, mantendo a responsabilidade de Models apenas para as entidades do banco de dados e usando DTOs para a comunicação da API.
+
+4. Implementar Autorização Baseada em Roles/Permissões
+A explicação sobre a configuração de roles no Keycloak e o mapeamento no .NET é clara e crucial.
+
+Críticas/Sugestões:
+
+RoleClaimType = "realm_access.roles": No Keycloak, a claim realm_access.roles é a forma mais comum de expor as roles atribuídas ao usuário no nível do realm.
+
+Ação: Verifique o token JWT (usando jwt.io) para confirmar exatamente onde suas roles estão (se em realm_access.roles ou resource_access.<client_id>.roles). Se for realm_access.roles, o .NET geralmente já faz esse mapeamento por padrão (quando a claim está na raiz), mas configurá-la explicitamente é uma boa prática para clareza e caso você precise de mapeamento mais complexo. Se estiver em resource_access, a configuração explícita é obrigatória.
+
+Mapeamento de Claims: Você já tem NameClaimType = "preferred_username", o que é um bom começo.
+
+5. Executando e Testando 🧪
+As instruções para reconstruir as imagens Docker, subir os contêineres e testar com o Postman (ou .http) estão no caminho certo.
+
+Críticas/Sugestões:
+
+docker compose build auth-service: Lembre-se de executar este comando sempre que houver mudanças no Dockerfile, csproj ou nos arquivos de código-fonte que afetam o build do Docker.
+
+Testes de Autorização: Testar os endpoints com diferentes tokens (com e sem a role admin) é essencial para validar se a autorização está funcionando como esperado.
+
+Próximas Ações Essenciais (Com base na sua decisão de manter o status quo para desenvolvimento):
+Revisar UsuarioRegisterDto e Lógica de Registro:
+
+Se você quer que o RegisterUsuario crie usuários tanto no Keycloak quanto no seu DB local, ele precisará fazer uma chamada para a API Admin do Keycloak para criar o usuário lá primeiro, e então persistir os dados no seu DB local (com o Id vindo do Keycloak, não um NewGuid()). Isso tornaria o fluxo mais coerente.
+
+Se RegisterUsuario for apenas para "sincronizar" usuários que já existem no Keycloak, ele deve ser [Authorize(Roles = "admin")] e receber o Id do Keycloak como parte do DTO.
+
+Pense: Quem será o "mestre" para a criação de usuários? Atualmente, parece haver duas formas de criar usuários que não se conversam.
+
+Verificar Mapeamento de Roles:
+
+Mais importante: Após obter um token do Keycloak, cole-o em jwt.io e verifique a seção de claims. Procure por realm_access e resource_access. Se suas roles estiverem dentro de realm_access.roles ou resource_access.<client_id>.roles, ajuste (se necessário) a propriedade RoleClaimType no Program.cs para garantir que o .NET reconheça suas roles corretamente. Isso é vital para que [Authorize(Roles = "admin")] funcione.
+
+Limpeza do launchSettings.json (Opcional):
+
+Se você vai usar o Docker Compose para rodar o serviço na maioria das vezes, o launchSettings.json se torna menos relevante. Você pode remover os launchBrowser para weatherforecast ou ajustar para algo que faz sentido para seu serviço de autenticação.
+
+O caminho que você está seguindo é sólido para o desenvolvimento. A principal "armadilha" agora é a gestão da identidade do usuário com o Keycloak e o seu banco de dados local. Resolvendo isso, o resto fluirá muito bem!
+-
+
+
+Olá Gemini, por favor em português e sem canvas!
+
+Contexto do Projeto 'SisInt' (ERP Industrial):
+ Estamos desenvolvendo do zero o 'SisInt', um ERP industrial baseado em arquitetura de microsserviços com 'API Gateway Kong'. Nosso ambiente de desenvolvimento local está em andamento no Windows 11 Home (64 bits, Intel x64).
+Ferramentas Atuais (Configuradas e Operacionais):
+ BD: Microsoft SQL Server 2019 ['(localdb)\MSSQLLocalDB' e 'host.docker.internal\\MSSQLLocalDB'], ORM: Entity Framework Core e SSMS21. Banco de dados: 'SisInt' (u:sa p:5@L0ca1)
+  sqllocaldb info MSSQLLocalDB
+  Name:               MSSQLLocalDB
+  Version:            15.0.4382.1
+  Shared name:
+  Owner:              TI-H04-DIOGOP\Diogo Oliveira
+  Auto-create:        Yes
+  State:              Running
+  Last start time:    22/07/2025 19:33:17
+  Instance pipe name: np:\\.\pipe\LOCALDB#8241BE2E\tsql\query
+ IDE: Visual Studio 2022 Community (v17.14.8) com pacotes '.NET'(asp/web,multi,desktop).
+ Contêineres: Docker (v28.3.0), Compose (v2.38.2) e Desktop (4.43.2).
+ Back-end: .NET Core 8 (SDK v9.0.302), visando .NET 8 LTS, com JwtBearer e Swashbuckle.
+ Front-end: Node.js (v22.17.0) e npm (v11.4.2) para React com Vite.
+ Segurança: Keycloak (em Docker).
+ Mensageria: RabbitMQ (em Docker).
+ Testes: Automatizados(Unitários/Integrados) e Postman.
+Serviços:
+ http://keycloak:8080/ (u:admin p:admin) : keycloak / via hosts para 127.0.0.1 com sisint-realm sisint-auth-service ylpwaJVLL0Ya3VeoSHtfPQUhVDbsy2F2 (u:admin p:@dm1N)
+ http://localhost:15672/ (u:guest p:guest) : rabbitmq
+ http://localhost:5173/ : frontend
+
+C:\Projetos\GitHub\SisInt>docker compose ps
+NAME           IMAGE                              COMMAND                  SERVICE        CREATED         STATUS                  PORTS
+auth-service   sisint-auth-service                "dotnet SisInt.Backe…"   auth-service   2 seconds ago   Up 1 second             0.0.0.0:5000->80/tcp, [::]:5000->80/tcp, 0.0.0.0:5001->443/tcp, [::]:5001->443/tcp
+frontend       sisint-frontend                    "/docker-entrypoint.…"   frontend       2 seconds ago   Up Less than a second   0.0.0.0:5173->80/tcp, [::]:5173->80/tcp
+keycloak       quay.io/keycloak/keycloak:latest   "/opt/keycloak/bin/k…"   keycloak       2 seconds ago   Up 1 second             0.0.0.0:8080->8080/tcp, [::]:8080->8080/tcp, 0.0.0.0:8443->8443/tcp, [::]:8443->8443/tcp
+rabbitmq       rabbitmq:3-management-alpine       "docker-entrypoint.s…"   rabbitmq       2 seconds ago   Up 1 second             0.0.0.0:5672->5672/tcp, [::]:5672->5672/tcp, 0.0.0.0:15672->15672/tcp, [::]:15672->15672/tcp
+
+C:\Projetos\GitHub\SisInt>docker ps -a
+CONTAINER ID   IMAGE                              COMMAND                  CREATED         STATUS                  PORTS                                                                                          NAMES
+4adfc5c10d43   sisint-frontend                    "/docker-entrypoint.…"   2 seconds ago   Up Less than a second   0.0.0.0:5173->80/tcp, [::]:5173->80/tcp                                                        frontend
+25d70f22c700   sisint-auth-service                "dotnet SisInt.Backe…"   2 seconds ago   Up 1 second             0.0.0.0:5000->80/tcp, [::]:5000->80/tcp, 0.0.0.0:5001->443/tcp, [::]:5001->443/tcp             auth-service
+9772af624a01   rabbitmq:3-management-alpine       "docker-entrypoint.s…"   2 seconds ago   Up 1 second             0.0.0.0:5672->5672/tcp, [::]:5672->5672/tcp, 0.0.0.0:15672->15672/tcp, [::]:15672->15672/tcp   rabbitmq
+4375170a8426   quay.io/keycloak/keycloak:latest   "/opt/keycloak/bin/k…"   2 seconds ago   Up 1 second             0.0.0.0:8080->8080/tcp, [::]:8080->8080/tcp, 0.0.0.0:8443->8443/tcp, [::]:8443->8443/tcp       keycloak
+
+POST http://localhost:8080/realms/sisint-realm/protocol/openid-connect/token : OK
+GET http://localhost:5000/TestAuth/public : OK
+GET http://localhost:5000/TestAuth : OK
+
+Estrutura do Projeto (C:\Projetos\GitHub\SisInt\):
+├── SisInt.sln
+├── docker-compose.yml
+└── src/
+    ├── SisInt.Backend.AuthService/
+    │   ├── Dockerfile
+    │   ├── SisInt.Backend.AuthService.csproj
+    │   ├── Properties/
+    │   │   └── launchSettings.json
+    │   ├── appsettings.json
+    │   ├── Program.cs
+    │   ├── Controllers/
+    │   │   └── TestAuthController.cs
+    │   ├── SisInt.Backend.AuthService.http
+    │   ├── Data/
+    │   │   └── ApplicationDbContext.cs
+    │   └── Models/
+    │       ├── Usuario.cs
+    │       ├── Perfil.cs
+    │       ├── Permissao.cs
+    │       ├── UsuarioPerfil.cs
+    │       ├── PermissaoPerfil.cs
+    │       └── LogAcesso.cs
+    └── SisInt.Frontend/
+        ├── Dockerfile
+        └── package.json
+
+Próximas Ferramentas a Configurar e Integrar:
+ Keycloak x Frontend x Backend.
+ API Gateway: Kong.
+ Integração de Mensageria: RabbitMQ.
+ Comunicação em Tempo Real: SignalR.
+Foco Atual da Assistência: Integração do Keycloak com o Frontend (React)
+ Por favor, me guie passo a passo para a etapa: Com o backend configurado para interagir com o Keycloak, o próximo passo é permitir que o frontend faça o mesmo para gerenciar as sessões de usuário.
+  Mantenha o foco apenas neste ponto, detalhando as etapas (configuração, código, etc), sempre trazendo exemplos.
+Detalhes Requeridos para a Etapa:
+
+Depois que o backend sabe como se comunicar com o Keycloak, é a vez do frontend. Garantir que o React possa iniciar o fluxo de login e gerenciar os tokens é crucial para uma experiência de usuário fluida e segura.
+
+Utilização de Bibliotecas de Autenticação:
+
+No projeto SisInt.Frontend, instale a biblioteca keycloak-js (via npm install keycloak-js ou yarn add keycloak-js).
+
+Configure esta biblioteca no seu aplicativo React para inicializar o Keycloak, redirecionar para a página de login do Keycloak, e gerenciar os tokens recebidos (access token, refresh token).
+
+Gerenciamento do Fluxo de Autenticação:
+
+Implemente a lógica para iniciar o fluxo de autenticação (redirecionar para o Keycloak para login).
+
+Lide com o retorno do Keycloak após o login (processar os tokens).
+
+Configure o frontend para incluir o access token em todas as requisições para o AuthService (e outros microsserviços), tipicamente no cabeçalho Authorization: Bearer <token>.
+
+Configurar o Frontend (React com Vite) para Autenticação Keycloak:
+
+Integrar o frontend para iniciar o fluxo de login (OAuth 2.0 / OpenID Connect) com o Keycloak.
+
+Armazenar e enviar o token JWT obtido nas requisições para o AuthService e outros microsserviços.
+
+Proteger rotas e componentes no frontend com base no status de autenticação.
+-
+
+Conexão do Frontend com o Backend e Comunicação
+Uma vez que autenticação e autorização estão estabelecidas em ambas as pontas, a comunicação entre frontend e backend se torna o foco. Configurar o CORS e as chamadas de API é essencial para que o frontend possa consumir os serviços protegidos do backend.
+Esta etapa foca em estabelecer a comunicação entre o frontend React e o AuthService (e futuros microsserviços).
+
+Comunicação Inter-Serviços no Docker: Certifique-se de que o frontend e o backend se comuniquem usando os nomes dos serviços do Docker Compose (ex: http://auth-service:80) quando rodando dentro do Docker, e não localhost.
+
+Configurar a Comunicação (CORS):
+
+No SisInt.Backend.AuthService, configure o CORS (Cross-Origin Resource Sharing) para permitir que o frontend (rodando em http://localhost:5173) faça requisições para a API do backend (rodando nas portas 5000/5001). Isso é crucial para evitar erros de segurança do navegador.
+
+Fazer Chamadas de API:
+
+No frontend React, utilize bibliotecas como axios ou a Fetch API nativa para fazer requisições HTTP para os endpoints do AuthService (ex: http://localhost:5000/api/auth/login).
+
+Garanta que os tokens de autenticação (obtidos via Keycloak) sejam enviados nas requisições protegidas.
+-
+
+Configuração do API Gateway Kong
+Introduzir o Kong após os serviços essenciais estarem comunicando permite que ele atue como a fachada unificada e segura. Isso facilita o roteamento, a aplicação de políticas de segurança (como validação de JWT, rate limiting) e a gestão centralizada das APIs, sem atrapalhar o desenvolvimento inicial dos microsserviços.
+Configuração do API Gateway Kong: Como o Kong se encaixa na arquitetura para rotear e proteger o acesso aos seus microsserviços.
+O Kong será o ponto de entrada para todas as requisições externas para seus microsserviços, proporcionando roteamento, segurança e outras funcionalidades.
+
+Adicionar o Kong ao docker-compose.yml:
+
+Modifique o docker-compose.yml para incluir um novo serviço para o Kong Gateway e seu banco de dados (geralmente PostgreSQL, rodando também em Docker).
+
+Configure as portas para o Kong (ex: 8000 para HTTP, 8443 para HTTPS, 8001 para a Admin API).
+
+Rever o docker-compose.yml: Será necessário adicionar os serviços para Kong e seu banco de dados, e talvez ajustar a rede para que o Kong possa se comunicar com seus outros microsserviços.
+
+Configurar Rotas no Kong:
+
+Após o Kong subir, você precisará configurá-lo (via sua Admin API ou arquivo de configuração) para definir as rotas que direcionarão o tráfego para o AuthService e outros microsserviços. Por exemplo, todas as requisições para http://localhost:8000/auth/ seriam roteadas para o contêiner auth-service.
+
+Pode-se também configurar plugins no Kong para funcionalidades como autenticação (se o Kong for validar o token JWT antes de passar para o backend), rate limiting, etc.
+
+Configurar o API Gateway Kong:
+
+Começar a rotear requisições para seus microsserviços através do Kong.
+
+Configurar plugins de autenticação no Kong (por exemplo, o plugin JWT) para validar tokens antes que as requisições cheguem aos microsserviços, aliviando a carga do AuthService e padronizando a segurança na borda.
+-
+
+Integração de Mensageria (RabbitMQ) e Comunicação em Tempo Real (SignalR)
+Estas são as camadas mais avançadas de comunicação. Lidar com elas por último garante que a infraestrutura básica (autenticação, banco de dados, comunicação síncrona) esteja sólida antes de adicionar complexidade de comunicação assíncrona e em tempo real.
+Esta etapa foca na comunicação assíncrona e em tempo real dentro do SisInt.
+
+Integrar o RabbitMQ com os Microsserviços .NET Core:
+
+Em cada microsserviço que precisar de comunicação assíncrona, adicione o pacote NuGet RabbitMQ.Client.
+
+Implemente a lógica para publicar mensagens (ex: um serviço de Pedidos publica um evento de "Pedido Criado") e consumir mensagens (ex: um serviço de Estoque consome o evento "Pedido Criado" para atualizar o estoque).
+
+A comunicação será via broker rabbitmq (o nome do serviço no docker-compose.yml).
+
+Implementação do SignalR Hub no Backend:
+
+No AuthService (ou em um novo microsserviço dedicado a comunicação em tempo real), adicione o pacote NuGet Microsoft.AspNetCore.SignalR.
+
+Crie um SignalR Hub que permitirá a comunicação bidirecional em tempo real entre o backend e o frontend. Isso é ideal para notificações, dashboards ao vivo, etc.
+
+Configure o SignalR no Program.cs para expor o endpoint do Hub.
+
+Integração do SignalR com o Frontend (React):
+
+No frontend React, use o pacote Microsoft/signalr para estabelecer conexão com o Hub do backend.
+
+Implemente a lógica para enviar e receber mensagens em tempo real.
+-
+
+Estilização:
+ Tailwind CSS: Para estilização utility-first, rápida e altamente configurável.
+ Styled Components / Emotion: Se você preferir CSS-in-JS.
+ Material UI / Ant Design: Para componentes UI pré-construídos e um design system pronto.
+
+Gerenciamento de Estado:
+ Context API + Hooks: Para gerenciamento de estado local e mais simples.
+ Zustand/Jotai: Bibliotecas leves e modernas para gerenciamento de estado global, mais simples que Redux em muitos casos.
+ React Query (TanStack Query): Essencial para gerenciar o estado assíncrono (dados de APIs), caching, revalidação e otimizações de performance.
+ Monitoramento e Logs (Azure Monitor/Application Insights): Para ter visibilidade sobre o desempenho e possíveis problemas da sua aplicação.
+
+Hospedagem:
+ Azure App Service: Para uma hospedagem PaaS (Platform as a Service) simplificada e escalável.
+ Azure Kubernetes Service (AKS): Se você precisar de orquestração de contêineres para microserviços e alta complexidade/escalabilidade.
+ Azure Container Apps: Uma opção mais simples que AKS, para hospedar contêineres e microserviços sem a complexidade total do Kubernetes.
+
+Documentação: Swagger/OpenAPI com Swashbuckle no .NET
+-
+
+'C:\Projetos\GitHub\SisInt\SisInt.sln
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36221.1
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SisInt.Backend.AuthService", "src\SisInt.Backend.AuthService\SisInt.Backend.AuthService.csproj", "{2BB78EBD-F11D-489F-BBEB-2F31D8A62645}"
+EndProject
+Project("{E24C65DC-7377-472B-9ABA-BC803B73C61A}") = "SisInt.Frontend", "src\SisInt.Frontend\", "{E95BD160-0AC8-DF7A-34E4-4AD9476C9D34}"
+	ProjectSection(WebsiteProperties) = preProject
+		TargetFrameworkMoniker = ".NETFramework,Version%3Dv4.0"
+		Debug.AspNetCompiler.VirtualPath = "/localhost_63777"
+		Debug.AspNetCompiler.PhysicalPath = "src\SisInt.Frontend\"
+		Debug.AspNetCompiler.TargetPath = "PrecompiledWeb\localhost_63777\"
+		Debug.AspNetCompiler.Updateable = "true"
+		Debug.AspNetCompiler.ForceOverwrite = "true"
+		Debug.AspNetCompiler.FixedNames = "false"
+		Debug.AspNetCompiler.Debug = "True"
+		Release.AspNetCompiler.VirtualPath = "/localhost_63777"
+		Release.AspNetCompiler.PhysicalPath = "src\SisInt.Frontend\"
+		Release.AspNetCompiler.TargetPath = "PrecompiledWeb\localhost_63777\"
+		Release.AspNetCompiler.Updateable = "true"
+		Release.AspNetCompiler.ForceOverwrite = "true"
+		Release.AspNetCompiler.FixedNames = "false"
+		Release.AspNetCompiler.Debug = "False"
+		VWDPort = "63777"
+		SlnRelativePath = "src\SisInt.Frontend\"
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Itens de Solução", "Itens de Solução", "{380A7511-A354-6D7A-0CC0-8FA1F1BA7B6C}"
+	ProjectSection(SolutionItems) = preProject
+		docker-compose.yml = docker-compose.yml
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{2BB78EBD-F11D-489F-BBEB-2F31D8A62645}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2BB78EBD-F11D-489F-BBEB-2F31D8A62645}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2BB78EBD-F11D-489F-BBEB-2F31D8A62645}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2BB78EBD-F11D-489F-BBEB-2F31D8A62645}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E95BD160-0AC8-DF7A-34E4-4AD9476C9D34}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E95BD160-0AC8-DF7A-34E4-4AD9476C9D34}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E95BD160-0AC8-DF7A-34E4-4AD9476C9D34}.Release|Any CPU.ActiveCfg = Debug|Any CPU
+		{E95BD160-0AC8-DF7A-34E4-4AD9476C9D34}.Release|Any CPU.Build.0 = Debug|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {472DF8BA-638B-4B58-B0FD-C9004D5342BB}
+	EndGlobalSection
+EndGlobal
+-
+'C:\Projetos\GitHub\SisInt\docker-compose.yml
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    container_name: keycloak
+    ports:
+      - "8080:8080"
+      - "8443:8443"
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      DB_VENDOR: h2
+      KC_HOSTNAME_STRICT_HTTPS: false
+      KC_HOSTNAME: keycloak
+      KC_HTTP_PORT: 8080
+      KC_HTTP_ENABLED: true
+    command: start-dev
+    networks:
+      - sisint-network
+    volumes:
+      - keycloak_data:/opt/keycloak/data
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    networks:
+      - sisint-network
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    restart: unless-stopped
+
+  auth-service:
+    build:
+      context: ./src/SisInt.Backend.AuthService
+      dockerfile: Dockerfile
+    container_name: auth-service
+    ports:
+      - "5000:80"
+      - "5001:443"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      Keycloak__Authority: http://keycloak:8080/realms/sisint-realm
+      Keycloak__Audience: sisint-auth-service
+      RabbitMQ__HostName: rabbitmq
+      RabbitMQ__UserName: guest
+      RabbitMQ__Password: guest
+    depends_on:
+      keycloak:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
+    networks:
+      - sisint-network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./src/SisInt.Frontend
+      dockerfile: Dockerfile
+    container_name: frontend
+    ports:
+      - "5173:80"
+    environment:
+      VITE_AUTH_SERVICE_URL: http://localhost:5000
+    depends_on:
+      auth-service:
+        condition: service_started
+    networks:
+      - sisint-network
+    restart: unless-stopped
+
+volumes:
+  keycloak_data:
+  rabbitmq_data:
+
+networks:
+  sisint-network:
+    driver: bridge
+-
+'C:\Projetos\GitHub\SisInt\src\SisInt.Backend.AuthService\Dockerfile
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+
+WORKDIR /app
+
+COPY SisInt.Backend.AuthService.csproj ./
+RUN dotnet restore
+
+COPY . .
+
+RUN dotnet build -c Release -o /app/build
+
+FROM build AS publish
+
+RUN dotnet publish -c Release -o /app/publish /p:UseAppHost=false
+
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
+
+WORKDIR /app
+
+EXPOSE 80
+
+COPY --from=publish /app/publish .
+
+ENTRYPOINT ["dotnet", "SisInt.Backend.AuthService.dll"]
+-
+'C:\Projetos\GitHub\SisInt\src\SisInt.Frontend\Dockerfile
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+COPY package.json ./
+COPY package-lock.json ./
+
+RUN npm install --frozen-lockfile
+
+COPY . .
+
+RUN npm run build
+
+FROM nginx:alpine
+
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]
+-
+'C:\Projetos\GitHub\SisInt\src\SisInt.Backend.AuthService\SisInt.Backend.AuthService.csproj
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+	<PropertyGroup>
+		<TargetFramework>net8.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.18" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.18">
+		  <PrivateAssets>all</PrivateAssets>
+		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
+		<PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.18" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.18">
+		  <PrivateAssets>all</PrivateAssets>
+		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
+		<PackageReference Include="Swashbuckle.AspNetCore" Version="8.1.4" />
+	</ItemGroup>
+
+</Project>
+-
+'C:\Projetos\GitHub\SisInt\src\SisInt.Backend.AuthService\Properties\launchSettings.json
+{
+  "$schema": "http://json.schemastore.org/launchsettings.json",
+  "iisSettings": {
+    "windowsAuthentication": false,
+    "anonymousAuthentication": true,
+    "iisExpress": {
+      "applicationUrl": "http://localhost:7260",
+      "sslPort": 44332
+    }
+  },
+  "profiles": {
+    "http": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "launchUrl": "weatherforecast",
+      "applicationUrl": "http://localhost:5072",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    },
+    "https": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "launchUrl": "weatherforecast",
+      "applicationUrl": "https://localhost:7132;http://localhost:5072",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    },
+    "IIS Express": {
+      "commandName": "IISExpress",
+      "launchBrowser": true,
+      "launchUrl": "weatherforecast",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}
+-
+'C:\Projetos\GitHub\SisInt\src\SisInt.Backend.AuthService\appsettings.json
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*",
+  "Keycloak": {
+    "Authority": "http://keycloak:8080/realms/sisint-realm",
+    "Audience": "sisint-auth-service"
+  },
+  "RabbitMQ": {
+    "HostName": "rabbitmq",
+    "UserName": "guest",
+    "Password": "guest"
+  },
+  "ConnectionStrings": {
+    "DefaultConnection": "Server=host.docker.internal\\MSSQLLocalDB;Database=SisInt;Trusted_Connection=True;TrustServerCertificate=True;"
+  }
+}
+-
+'C:\Projetos\GitHub\SisInt\src\SisInt.Backend.AuthService\Program.cs
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using SisInt.Backend.AuthService;
+using SisInt.Backend.AuthService.Data;
+using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.WebHost.UseUrls("http://*:80");
+
+builder.Services.AddDbContext<ApplicationDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.Authority = builder.Configuration["Keycloak:Authority"];
+
+    options.Audience = builder.Configuration["Keycloak:Audience"];
+
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+
+        ClockSkew = TimeSpan.Zero,
+
+        ValidateIssuer = true,
+
+        ValidIssuers = ["http://keycloak:8080/realms/sisint-realm"]
+    };
+
+    options.RequireHttpsMetadata = false;
+
+    options.Events = new JwtBearerEvents
+    {
+        OnAuthenticationFailed = context =>
+        {
+            Console.WriteLine($"Authentication failed: {context.Exception.Message}");
+            return Task.CompletedTask;
+        },
+        OnTokenValidated = context =>
+        {
+            Console.WriteLine("Token successfully validated!");
+            return Task.CompletedTask;
+        },
+        OnMessageReceived = context =>
+        {
+            return Task.CompletedTask;
+        }
+    };
+});
+
+builder.Services.AddAuthorization();
+
+builder.Services.AddControllers();
+
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    dbContext.Database.Migrate();
+}
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+app.UseRouting();
+
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.MapControllers();
+
+app.Run();
+-
+'C:\Projetos\GitHub\SisInt\src\SisInt.Backend.AuthService\Controllers\TestAuthController.cs
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using System.Linq;
+using System.Security.Claims;
+
+namespace SisInt.Backend.AuthService.Controllers
+{
+    [ApiController]
+    [Route("[controller]")]
+    public class TestAuthController : ControllerBase
+    {
+        [HttpGet]
+        [Authorize]
+        public IActionResult GetAuthenticatedData()
+        {
+            var userName = User.Claims.FirstOrDefault(c => c.Type == "preferred_username")?.Value;
+
+            if (string.IsNullOrEmpty(userName))
+            {
+                userName = User.Identity?.Name;
+            }
+
+            var userId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
+
+            var userEmail = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Email)?.Value;
+
+            return Ok($"Olá, {userName ?? "Usuário Anônimo"}! " +
+                      $"Seu ID de usuário é: {userId ?? "Não disponível"}. " +
+                      $"Seu email é: {userEmail ?? "Não disponível"}. " +
+                      $"Você está autenticado com sucesso!");
+        }
+
+        [HttpGet("public")]
+        public IActionResult GetPublicData()
+        {
+            return Ok("Este é um endpoint público, não requer autenticação.");
+        }
+    }
+}
+-
+'C:\Projetos\GitHub\SisInt\src\SisInt.Backend.AuthService\SisInt.Backend.AuthService.http
+@SisInt.Backend.AuthService_HostAddress = http://localhost:5000
+
+GET {{SisInt.Backend.AuthService_HostAddress}}/TestAuth/public
+Accept: application/json
+
+###
+@name getToken
+POST http://localhost:8080/realms/sisint-realm/protocol/openid-connect/token
+Content-Type: application/x-www-form-urlencoded
+
+client_id=sisint-auth-service&grant_type=password&username=admin&password=@dm1N&client_secret=ylpwaJVLL0Ya3VeoSHtfPQUhVDbsy2F2
+
+###
+GET {{SisInt.Backend.AuthService_HostAddress}}/TestAuth
+Authorization: Bearer {{getToken.response.body.access_token}}
+Accept: application/json
+-
+'C:\Projetos\GitHub\SisInt\src\SisInt.Backend.AuthService\Data\ApplicationDbContext.cs
+using Microsoft.EntityFrameworkCore;
+using SisInt.Backend.AuthService.Models;
+
+namespace SisInt.Backend.AuthService.Data
+{
+    public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : DbContext(options)
+    {
+        public DbSet<Usuario> Usuarios { get; set; }
+        public DbSet<Perfil> Perfis { get; set; }
+        public DbSet<Permissao> Permissoes { get; set; }
+        public DbSet<UsuarioPerfil> UsuarioPerfis { get; set; }
+        public DbSet<PermissaoPerfil> PermissaoPerfis { get; set; }
+        public DbSet<LogAcesso> LogAcessos { get; set; }
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            modelBuilder.Entity<UsuarioPerfil>()
+                .HasKey(up => new { up.UsuarioId, up.PerfilId });
+
+            modelBuilder.Entity<UsuarioPerfil>()
+                .HasOne(up => up.Usuario)
+                .WithMany(u => u.UsuarioPerfis)
+                .HasForeignKey(up => up.UsuarioId);
+
+            modelBuilder.Entity<UsuarioPerfil>()
+                .HasOne(up => up.Perfil)
+                .WithMany(p => p.UsuarioPerfis)
+                .HasForeignKey(up => up.PerfilId);
+
+            modelBuilder.Entity<PermissaoPerfil>()
+                .HasKey(pp => new { pp.PermissaoId, pp.PerfilId });
+
+            modelBuilder.Entity<PermissaoPerfil>()
+                .HasOne(pp => pp.Permissao)
+                .WithMany(p => p.PermissaoPerfis)
+                .HasForeignKey(pp => pp.PermissaoId);
+
+            modelBuilder.Entity<PermissaoPerfil>()
+                .HasOne(pp => pp.Perfil)
+                .WithMany(p => p.PermissaoPerfis)
+                .HasForeignKey(pp => pp.PerfilId);
+
+            base.OnModelCreating(modelBuilder);
+        }
+    }
+}
+-
+'C:\Projetos\GitHub\SisInt\src\SisInt.Backend.AuthService\Models\Usuario.cs
+using System.ComponentModel.DataAnnotations;
+using System.Collections.Generic;
+
+namespace SisInt.Backend.AuthService.Models
+{
+    public class Usuario
+    {
+        [Key]
+        public Guid Id { get; set; }
+        [Required]
+        [MaxLength(256)]
+        public required string Username { get; set; }
+        [Required]
+        [MaxLength(256)]
+        public required string Email { get; set; }
+        public bool EmailConfirmado { get; set; }
+        public DateTime DataCriacao { get; set; } = DateTime.UtcNow;
+
+        public required ICollection<UsuarioPerfil> UsuarioPerfis { get; set; }
+        public required ICollection<LogAcesso> LogAcessos { get; set; }
+    }
+}
+-
+'C:\Projetos\GitHub\SisInt\src\SisInt.Backend.AuthService\Models\Perfil.cs
+using System.ComponentModel.DataAnnotations;
+using System.Collections.Generic;
+
+namespace SisInt.Backend.AuthService.Models
+{
+    public class Perfil
+    {
+        [Key]
+        public int Id { get; set; }
+        [Required]
+        [MaxLength(50)]
+        public required string Nome { get; set; }
+        [MaxLength(250)]
+        public required string Descricao { get; set; }
+
+        public required ICollection<PermissaoPerfil> PermissaoPerfis { get; set; }
+        public required ICollection<UsuarioPerfil> UsuarioPerfis { get; set; }
+    }
+}
+-
+'C:\Projetos\GitHub\SisInt\src\SisInt.Backend.AuthService\Models\Permissao.cs
+using System.ComponentModel.DataAnnotations;
+using System.Collections.Generic;
+
+namespace SisInt.Backend.AuthService.Models
+{
+    public class Permissao
+    {
+        [Key]
+        public int Id { get; set; }
+        [Required]
+        [MaxLength(100)]
+        public required string Nome { get; set; }
+        [MaxLength(250)]
+        public required string Descricao { get; set; }
+
+        public required ICollection<PermissaoPerfil> PermissaoPerfis { get; set; }
+    }
+}
+-
+'C:\Projetos\GitHub\SisInt\src\SisInt.Backend.AuthService\Models\UsuarioPerfil.cs
+namespace SisInt.Backend.AuthService.Models
+{
+    public class UsuarioPerfil
+    {
+        public Guid UsuarioId { get; set; }
+        public required Usuario Usuario { get; set; }
+
+        public int PerfilId { get; set; }
+        public required Perfil Perfil { get; set; }
+    }
+}
+-
+'C:\Projetos\GitHub\SisInt\src\SisInt.Backend.AuthService\Models\PermissaoPerfil.cs
+namespace SisInt.Backend.AuthService.Models
+{
+    public class PermissaoPerfil
+    {
+        public int PermissaoId { get; set; }
+        public required Permissao Permissao { get; set; }
+
+        public int PerfilId { get; set; }
+        public required Perfil Perfil { get; set; }
+    }
+}
+-
+'C:\Projetos\GitHub\SisInt\src\SisInt.Backend.AuthService\Models\LogAcesso.cs
+using System.ComponentModel.DataAnnotations;
+
+namespace SisInt.Backend.AuthService.Models
+{
+    public class LogAcesso
+    {
+        [Key]
+        public int Id { get; set; }
+        public Guid UsuarioId { get; set; }
+        public required Usuario Usuario { get; set; }
+        public DateTime DataAcesso { get; set; } = DateTime.UtcNow;
+        [MaxLength(100)]
+        public required string IPOrigem { get; set; }
+        [MaxLength(250)]
+        public required string Detalhes { get; set; }
+    }
+}
+-
+'C:\Projetos\GitHub\SisInt\src\SisInt.Frontend\package.json
+{
+  "dependencies": {
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.30.1",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^4.6.0",
+    "eslint": "^9.30.1",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.20",
+    "globals": "^16.3.0",
+    "typescript": "~5.8.3",
+    "typescript-eslint": "^8.35.1",
+    "vite": "^7.0.3"
+  },
+  "name": "sisint-frontend",
+  "private": true,
+  "scripts": {
+    "build": "tsc -b && vite build",
+    "dev": "vite",
+    "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
+    "preview": "vite preview"
+  },
+  "type": "module",
+  "version": "0.0.0"
+}
+-
