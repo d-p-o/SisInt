@@ -344,6 +344,116 @@ O caminho que você está seguindo é sólido para o desenvolvimento. A principa
 -
 
 
+SisInt: ERP Industrial Moderno com Microsserviços
+
+O SisInt será um sistema ERP (Enterprise Resource Planning) focado na indústria,
+
+ desenvolvido com uma arquitetura de microsserviços e utilizando um conjunto de tecnologias modernas.
+
+
+Tecnologias Principais:
+
+  Back-end: .NET 8 LTS com Entity Framework Core.
+
+  Front-end: React com Vite.
+
+  Contêineres: Docker e Docker Compose.
+
+  Autenticação/Autorização: Keycloak.
+
+  API Gateway: Kong.
+
+  Mensageria: RabbitMQ.
+
+  Comunicação em Tempo Real: SignalR.
+
+  Banco de Dados: Microsoft SQL Server 2019 LocalDB.
+
+
+Características:
+
+  Arquitetura de Microsserviços: Flexibilidade, escalabilidade e resiliência.
+
+  Ambiente Conteinerizado: Facilidade de desenvolvimento e implantação.
+
+  Segurança Robusta: Integração com Keycloak para gestão de identidade e acesso.
+
+  Comunicação Assíncrona: Utilização de RabbitMQ para troca de mensagens.
+-
+
+
+Projeto SisInt: ERP Industrial com Microsserviços e Tecnologias Modernas
+O projeto SisInt é um sistema ERP (Enterprise Resource Planning) de base industrial, atualmente em desenvolvimento inicial, que se destaca pela sua arquitetura moderna e escalável de microsserviços. Construído do zero para atender às demandas de um ambiente industrial, o SisInt visa oferecer uma solução robusta e flexível.
+
+Arquitetura e Tecnologia
+A base da arquitetura do SisInt é orientada a microsserviços, o que garante modularidade, escalabilidade e resiliência. Para gerenciar e rotear as requisições entre esses serviços, o projeto emprega o API Gateway Kong.
+
+O ambiente de desenvolvimento local está configurado no Windows 11 Home (64 bits, Intel x64), e a equipe tem utilizado um conjunto de ferramentas e tecnologias de ponta:
+
+Banco de Dados: Microsoft SQL Server 2019 LocalDB ($'(localdb)\MSSQLLocalDB'$ e  
+′
+ host.docker.internal
+MSSQLLocalDB 
+′
+ ), com gerenciamento via SSMS21 e uso do Entity Framework Core como ORM. O banco de dados principal, nomeado 'SisInt', já está configurado.
+
+Contêineres: A gestão dos serviços conteinerizados é feita via Docker, Docker Compose e Docker Desktop, permitindo um ambiente de desenvolvimento isolado e replicável.
+
+Back-end: Desenvolvido em .NET Core 8 (SDK v9.0.302), visando a versão .NET 8 LTS, o back-end utiliza JwtBearer para autenticação e Swashbuckle para documentação de API, garantindo segurança e facilidade de consumo. O serviço de autenticação ( 
+′
+ auth−service 
+′
+ ) já está em execução em um contêiner Docker.
+
+Front-end: A interface do usuário é construída com React, utilizando Node.js (v22.17.0) e npm (v11.4.2), e otimizada pelo Vite para um desenvolvimento ágil e performático. O front-end também já está conteinerizado e acessível via $http://localhost:5173/$.
+
+Segurança: O Keycloak, uma solução robusta de gerenciamento de identidade e acesso, está conteinerizado e operacional, sendo fundamental para a segurança do sistema. O realm 'sisint−realm' e o cliente 'sisint−auth−service' já estão configurados.
+
+Mensageria: Para comunicação assíncrona entre os microsserviços, o RabbitMQ está configurado e em execução em um contêiner Docker, pronto para integrar funcionalidades de troca de mensagens.
+
+Testes: A qualidade do código é assegurada por testes automatizados (unitários e de integração), complementados por validações via Postman.
+
+Componentes e Serviços Atuais
+O projeto já possui os seguintes serviços em execução e acessíveis:
+
+Keycloak: $http://keycloak:8080/$ (ou via $127.0.0.1$ para 'keycloak'), responsável pela autenticação e autorização.
+
+RabbitMQ: $http://localhost:15672/$ (interface de gerenciamento).
+
+Front-end: $http://localhost:5173/$.
+
+Serviço de Autenticação (AuthService): Rodando em $http://localhost:5000/ (HTTP) e $http://localhost:5001/ (HTTPS), com endpoints de teste de acesso público e autenticado já validados.
+
+Estrutura do Projeto
+A organização do código-fonte segue uma estrutura clara e modular:
+
+SisInt.sln: O arquivo de solução principal do Visual Studio.
+
+docker-compose.yml: Define os serviços Docker e suas configurações.
+
+src/: Contém os diretórios dos microsserviços e do front-end.
+
+SisInt.Backend.AuthService/: Microsserviço de autenticação, incluindo $Dockerfile$, $csproj$, controladores (ex: `TestAuthController.cs 
+′
+ ), contexto de banco de dados (ApplicationDbContext.cs), e modelos de dados para usuários, perfis e permissões.
+
+SisInt.Frontend/: Aplicação front-end com seu $Dockerfile$ e $package.json$.
+
+Próximos Passos
+Os próximos estágios do projeto SisInt focarão na integração e configuração de componentes essenciais para a sua completa funcionalidade:
+
+Integração de Segurança: Estabelecer a comunicação completa entre Keycloak, Front-end e Back-end para um fluxo de autenticação e autorização seguro e coeso.
+
+Implementação do API Gateway: Configurar e implantar o Kong como o ponto de entrada central para todos os microsserviços, otimizando o roteamento e a gestão de APIs.
+
+Mensageria: Aprofundar a integração com RabbitMQ para habilitar a comunicação assíncrona e a troca de eventos entre os diferentes serviços.
+
+Comunicação em Tempo Real: Incorporar o SignalR para adicionar capacidades de comunicação em tempo real, permitindo atualizações instantâneas e interatividade no sistema.
+
+O projeto SisInt está em um estágio promissor de desenvolvimento, com uma base tecnológica sólida e um roadmap claro para se tornar um ERP industrial robusto e eficiente.
+-
+
+
 Olá Gemini, por favor em português e sem canvas!
 
 Contexto do Projeto 'SisInt' (ERP Industrial):
