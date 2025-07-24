@@ -35,6 +35,25 @@ services:
       - rabbitmq_data:/var/lib/rabbitmq
     restart: unless-stopped
 
+  sql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: sql
+    ports:
+      - "1433:1433"
+    environment:
+      SA_PASSWORD: "5@L0ca1h"
+      ACCEPT_EULA: "Y"
+    healthcheck:
+      test: ["CMD", "/opt/mssql-tools/bin/sqlcmd", "-S", "localhost", "-U", "sa", "-P", "5@L0ca1h", "-Q", "SELECT 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - sisint-network
+    volumes:
+      - sql_data:/var/opt/mssql
+    restart: unless-stopped
+
   auth-service:
     build:
       context: ./src/SisInt.Backend.AuthService
@@ -50,10 +69,13 @@ services:
       RabbitMQ__HostName: rabbitmq
       RabbitMQ__UserName: guest
       RabbitMQ__Password: guest
+      ConnectionStrings__DefaultConnection: "Server=sql,1433;Database=SisInt;User Id=sa;Password=5@L0ca1h;TrustServerCertificate=True"
     depends_on:
       keycloak:
         condition: service_started
       rabbitmq:
+        condition: service_started
+      sql:
         condition: service_started
     networks:
       - sisint-network
@@ -78,6 +100,7 @@ services:
 volumes:
   keycloak_data:
   rabbitmq_data:
+  sql_data:
 
 networks:
   sisint-network:

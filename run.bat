@@ -1,4 +1,4 @@
-﻿docker compose down
+docker compose down
 docker compose up --build -d
 docker compose ps
 docker ps -a
