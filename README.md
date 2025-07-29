@@ -1,3 +1,4 @@
+
 # SisInt - Sistema Integrado de Planejamento de Recursos Empresariais
 
 ---
@@ -49,7 +50,7 @@ As ferramentas atualmente configuradas e operacionais no ambiente **Windows 11 H
 * **IDE:** **Visual Studio 2022 Community** (v17.14.8) com pacotes '.NET' (ASP/Web, Multiplataforma, Desktop).
 * **Back-end:** **.NET Core 8 LTS** (SDK v9.0.302).
 * **Front-end:** **Node.js** (v22.17.0) e **npm** (v11.4.2).
-* **Segurança:** **Keycloak** (realm: `sisint-realm`, client: `sisint-auth-service`, segredo: `ylpwaJVLL0Ya3VeoSHtfPQUhVDbsy2F2`, user: `admin` / `@dm1N`).
+* **Segurança:** **Keycloak** (realm: `sisint-realm`, client: `sisint-auth-service`, user: `admin` / `@dm1N`). **O AuthService está configurado para reconhecer e aplicar roles do Keycloak (ex: admin, user, manager) via JWT.**
 * **Mensageria:** **RabbitMQ**.
 * **Testes:** Atualmente, testes manuais são realizados por **HTTP** na solução e via **Postman**.
 
@@ -75,13 +76,14 @@ Os seguintes serviços estão configurados e podem ser acessados após levantar 
 
 ---
 
-## ✅ Testes Atuais Validados
+## ✅ Testes Manuais e Resultados
 
-Os seguintes testes foram validados com sucesso:
-
-* **Autenticação Keycloak:** `POST http://localhost:8080/realms/sisint-realm/protocol/openid-connect/token` (OK)
-* **Endpoint Público (AuthService):** `GET http://localhost:5000/TestAuth/public` (OK)
-* **Endpoint Protegido (AuthService):** `GET http://localhost:5000/TestAuth` (OK)
+* `POST http://localhost:8080/realms/sisint-realm/protocol/openid-connect/token`: **OK** (Obtenção de Token Keycloak)
+* `GET http://localhost:5000/TestAuth/public`: **OK** (Acesso a Endpoint Público)
+* `GET http://localhost:5000/TestAuth`: **OK** (Acesso a Endpoint Protegido)
+* `POST http://localhost:5000/api/Usuario`: **OK** (Registro de Usuário)
+* `GET http://localhost:5000/api/Usuario`: **OK** (Listagem de Usuários)
+* `GET http://localhost:5000/api/Usuario/{usuario_id}`: **OK** (Obtenção de Usuário por ID)
 
 ---
 

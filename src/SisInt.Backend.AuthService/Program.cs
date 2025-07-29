@@ -33,7 +33,11 @@ builder.Services.AddAuthentication(options =>
 
         ValidateIssuer = true,
 
-        ValidIssuers = ["http://keycloak:8080/realms/sisint-realm"]
+        ValidIssuers = ["http://keycloak:8080/realms/sisint-realm"],
+
+        NameClaimType = "preferred_username", // ou "name" se preferir
+
+        RoleClaimType = "realm_access.roles" // ajuste para "resource_access.sisint-auth-service.roles" se necessário
     };
 
     options.RequireHttpsMetadata = false;
@@ -59,7 +63,11 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddAuthorization();
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.Preserve;
+    });
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -69,7 +77,15 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    dbContext.Database.Migrate();
+    try
+    {
+        dbContext.Database.Migrate();
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Erro ao executar Migrate(): {ex.Message}\n{ex.StackTrace}");
+        // Aqui você pode adicionar log para arquivo ou sistema de monitoramento
+    }
 }
 
 if (app.Environment.IsDevelopment())

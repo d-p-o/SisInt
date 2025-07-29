@@ -1,15 +1,37 @@
 @host = http://localhost:5000
 
+### Endpoint público (sem autenticação)
 GET {{host}}/TestAuth/public
 Accept: application/json
 
-###
+### Autenticação - Obter token JWT do Keycloak
 POST http://localhost:8080/realms/sisint-realm/protocol/openid-connect/token
 Content-Type: application/x-www-form-urlencoded
 
 client_id=sisint-auth-service&grant_type=password&username=admin&password=@dm1N&client_secret=ylpwaJVLL0Ya3VeoSHtfPQUhVDbsy2F2
 
-###
+### Endpoint protegido (exige token Bearer)
 GET {{host}}/TestAuth
 Authorization: Bearer {{access_token}}
 Accept: application/json
+
+### Registro de usuário (sem autenticação, se AllowAnonymous)
+POST {{host}}/api/Usuario
+Content-Type: application/json
+
+{
+    "username": "novo.usuario",
+    "email": "novo.usuario@sisint.com"
+}
+
+### Listar usuários (exige role 'admin')
+GET {{host}}/api/Usuario
+Authorization: Bearer {{access_token}}
+Accept: application/json
+
+### Obter usuário por ID (exige role 'admin' ou 'user')
+GET {{host}}/api/Usuario/37d7493f-71fd-414d-8407-0cc2d0cd4e2b
+Authorization: Bearer {{access_token}}
+Accept: application/json
+
+# Response

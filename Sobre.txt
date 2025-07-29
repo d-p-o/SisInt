@@ -29,6 +29,7 @@ O projeto está organizado na seguinte estrutura de diretórios:
       │   ├── Program.cs
       │   ├── Controllers/
       │   │   └── TestAuthController.cs
+      │   │   └── UsuarioController.cs
       │   ├── SisInt.Backend.AuthService.http
       │   ├── Data/
       │   │   └── ApplicationDbContext.cs
@@ -49,7 +50,7 @@ As ferramentas atualmente configuradas e operacionais no ambiente Windows 11 Hom
  IDE: Visual Studio 2022 Community (v17.14.8) com pacotes '.NET' (ASP/Web, Multiplataforma, Desktop).
  Back-end: .NET 8 LTS (SDK v9.0.302), com JwtBearer para autenticação e Swashbuckle para documentação de API.
  Front-end: Node.js (v22.17.0) e npm (v11.4.2) para desenvolvimento React com Vite.
- Segurança: Keycloak (realm: sisint-realm, client: sisint-auth-service, segredo: ylpwaJVLL0Ya3VeoSHtfPQUhVDbsy2F2, user: (u:admin p:@dm1N).
+ Segurança: Keycloak (realm: sisint-realm, client: sisint-auth-service, segredo: ylpwaJVLL0Ya3VeoSHtfPQUhVDbsy2F2, user: (u:admin p:@dm1N) e roles: admin, user e manager.
  Mensageria: RabbitMQ.
  Testes: Atualmente, são realizados testes manuais(http) e via Postman.
 
@@ -65,10 +66,13 @@ Endereços para Acesso:
  RabbitMQ (Gerenciamento): http://localhost:15672/. (u:guest / p:guest)
  Front-end: http://localhost:5173/.
 
-Testes Atuais Validados:
- POST http://localhost:8080/realms/sisint-realm/protocol/openid-connect/token: OK
- GET http://localhost:5000/TestAuth/public: OK
- GET http://localhost:5000/TestAuth: OK
+Testes Manuais e Resultados
+ POST http://localhost:8080/realms/sisint-realm/protocol/openid-connect/token: OK (Obtenção de Token Keycloak)
+ GET http://localhost:5000/TestAuth/public: OK (Acesso a Endpoint Público)
+ GET http://localhost:5000/TestAuth: OK (Acesso a Endpoint Protegido)
+ POST http://localhost:5000/api/Usuario: OK (Registro de Usuário)
+ GET http://localhost:5000/api/Usuario: OK (Listagem de Usuários)
+ GET http://localhost:5000/api/Usuario/{usuario_id}: OK (Obtenção de Usuário por ID)
 
 Próximos Passos e Integrações
  O roadmap do SisInt foca na integração e configuração de componentes essenciais para a sua funcionalidade completa:
@@ -83,236 +87,6 @@ O SisInt avança como um futuro ERP robusto e eficiente, com uma base tecnológi
 -
 
 
-Tratamento de Erros no Migrate(): Em um cenário mais robusto (mesmo para desenvolvimento), é bom adicionar um bloco try-catch ao redor do dbContext.Database.Migrate(); para lidar com possíveis falhas na migração de forma mais graciosa, logando o erro em vez de deixar a aplicação crashar.
--
-
-3. Criação de Endpoints da API no AuthService
-Vamos criar alguns endpoints para gerenciar usuários e perfis, interagindo com o banco de dados local.
-
-3.1. Controller para Usuários (Exemplo)
-Crie um novo controlador UsuarioController.cs na pasta Controllers.
-
-src\SisInt.Backend.AuthService\Controllers\UsuarioController.cs
-
-C#
-
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using SisInt.Backend.AuthService.Data;
-using SisInt.Backend.AuthService.Models;
-using Microsoft.EntityFrameworkCore;
-using System.Security.Claims;
-
-namespace SisInt.Backend.AuthService.Controllers
-{
-    [ApiController]
-    [Route("api/[controller]")]
-    [Authorize] // Todos os endpoints aqui exigem autenticação por padrão
-    public class UsuarioController : ControllerBase
-    {
-        private readonly ApplicationDbContext _context;
-
-        public UsuarioController(ApplicationDbContext context)
-        {
-            _context = context;
-        }
-
-        /// <summary>
-        /// Obtém todos os usuários registrados localmente.
-        /// </summary>
-        /// <remarks>
-        /// Requer a role 'admin'.
-        /// </remarks>
-        [HttpGet]
-        [Authorize(Roles = "admin")] // Exige a role 'admin'
-        public async Task<ActionResult<IEnumerable<Usuario>>> GetUsuarios()
-        {
-            return Ok(await _context.Usuarios.ToListAsync());
-        }
-
-        /// <summary>
-        /// Obtém um usuário específico por ID.
-        /// </summary>
-        /// <param name="id">ID do usuário (Guid).</param>
-        /// <remarks>
-        /// Requer a role 'admin' ou ser o próprio usuário.
-        /// </remarks>
-        [HttpGet("{id}")]
-        [Authorize(Roles = "admin, user")] // Permite 'admin' ou 'user'
-        public async Task<ActionResult<Usuario>> GetUsuario(Guid id)
-        {
-            var userIdClaim = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
-            if (User.IsInRole("admin") || (userIdClaim != null && new Guid(userIdClaim) == id))
-            {
-                var usuario = await _context.Usuarios.FindAsync(id);
-
-                if (usuario == null)
-                {
-                    return NotFound();
-                }
-
-                return Ok(usuario);
-            }
-            return Forbid(); // Usuário não autorizado
-        }
-
-        /// <summary>
-        /// Registra um novo usuário no banco de dados local.
-        /// </summary>
-        /// <remarks>
-        /// Este endpoint pode ser usado para sincronizar usuários do Keycloak para o banco de dados local,
-        /// ou para registrar usuários que não são inicialmente gerenciados pelo Keycloak, mas exigem
-        /// uma entrada no banco de dados do SisInt.
-        /// Requer a role 'admin'.
-        /// </remarks>
-        [HttpPost]
-        [AllowAnonymous] // Pode ser acessado sem autenticação inicial (para registro público, por exemplo)
-                         // Ou [Authorize(Roles = "admin")] se o registro for restrito.
-        public async Task<ActionResult<Usuario>> RegisterUsuario([FromBody] UsuarioRegisterDto usuarioDto)
-        {
-            if (await _context.Usuarios.AnyAsync(u => u.Email == usuarioDto.Email))
-            {
-                return Conflict("Um usuário com este email já existe.");
-            }
-            
-            // Gerar um novo Guid para o ID do usuário local, ou usar o ID do Keycloak se disponível
-            // Por simplicidade, geramos um novo aqui. Em um cenário real, você pode querer
-            // vincular ao ID do usuário no Keycloak.
-            var novoUsuario = new Usuario
-            {
-                Id = Guid.NewGuid(), // Ou usuarioDto.KeycloakId se estiver sincronizando
-                Username = usuarioDto.Username,
-                Email = usuarioDto.Email,
-                EmailConfirmado = false, // Em um cenário real, isso viria do Keycloak ou de um processo de verificação
-                DataCriacao = DateTime.UtcNow
-            };
-
-            _context.Usuarios.Add(novoUsuario);
-            await _context.SaveChangesAsync();
-
-            // Log de acesso (opcional, pode ser feito por um serviço de mensageria)
-            _context.LogAcessos.Add(new LogAcesso
-            {
-                UsuarioId = novoUsuario.Id,
-                DataAcesso = DateTime.UtcNow,
-                IPOrigem = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "N/A",
-                Detalhes = $"Usuário {novoUsuario.Username} registrado localmente."
-            });
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction(nameof(GetUsuario), new { id = novoUsuario.Id }, novoUsuario);
-        }
-
-        // DTO para registro de usuário
-        public class UsuarioRegisterDto
-        {
-            [Required]
-            public string Username { get; set; }
-            [Required]
-            [EmailAddress]
-            public string Email { get; set; }
-            // Opcional: Se você quiser vincular o ID do Keycloak diretamente
-            // public Guid? KeycloakId { get; set; } 
-        }
-    }
-}
-3.2. Implementar Autorização Baseada em Roles/Permissões
-Você já tem a configuração básica do JwtBearer para autenticação com o Keycloak. Para usar a autorização baseada em roles, o Keycloak precisa incluir as roles no token JWT.
-
-No Keycloak:
-
-Criar Roles: Acesse a interface de administração do Keycloak (http://keycloak:8080/). Faça login com admin/admin.
-
-Navegue até o realm sisint-realm.
-
-Vá para Roles (Papéis).
-
-Crie uma nova role, por exemplo, admin. Você pode criar outras roles como user, manager, etc.
-
-Vá para Users (Usuários).
-
-Selecione o usuário admin (ou crie um novo).
-
-Vá para a aba Role Mappings (Mapeamento de Papéis).
-
-Em "Available Roles" (Papéis Disponíveis), selecione a role admin e adicione-a às "Assigned Roles" (Papéis Atribuídos).
-
-Repita para outras roles e usuários conforme necessário.
-
-No AuthService (Código):
-
-O EF Core e o .NET já entendem a anotação [Authorize(Roles = "nome_da_role")]. O JwtBearer padrão do .NET já mapeia as roles do Keycloak (que vêm na claim realm_access.roles ou resource_access.<client_id>.roles no JWT) para as roles que o [Authorize] pode usar.
-
-Se a sua claim de role não estiver sendo mapeada corretamente, você pode personalizar o mapeamento no Program.cs. No seu caso, o Keycloak geralmente envia as roles como realm_access.roles. O .NET mapeia isso automaticamente. No entanto, se precisar de mapeamento específico, você pode adicionar no AddJwtBearer as opções:
-
-C#
-
-.AddJwtBearer(options =>
-{
-    // ... suas configurações existentes ...
-
-    options.TokenValidationParameters = new TokenValidationParameters
-    {
-        // ...
-        NameClaimType = "preferred_username", // ou "name"
-        RoleClaimType = "realm_access.roles" // Ou "resource_access.<client_id>.roles" se estiver usando roles de cliente
-    };
-    // ...
-});
-Importante: Verifique o conteúdo do token JWT emitido pelo Keycloak (você pode decodificá-lo em jwt.io) para confirmar como as roles estão sendo enviadas (geralmente em realm_access.roles ou resource_access). Se forem resource_access.<client_id>.roles, você precisará ajustar o RoleClaimType para resource_access.<seu_client_id>.roles.
-
-O exemplo de UsuarioController já demonstra o uso de [Authorize(Roles = "admin")] e [Authorize(Roles = "admin, user")].
-
-4. Executando e Testando
-Reconstrua a imagem Docker do AuthService:
-Como você adicionou novos pacotes NuGet e alterou o código, você precisa reconstruir a imagem Docker do auth-service. Vá para a pasta raiz do seu projeto C:\Projetos\GitHub\SisInt\ e execute:
-
-Bash
-
-docker compose build auth-service
-Inicie os contêineres Docker:
-
-Bash
-
-docker compose up -d
-Verifique se o banco de dados foi criado:
-Abra o SQL Server Management Studio (SSMS) e conecte-se à sua instância localhost,1433 sa/. Verifique se o banco de dados SisInt e as tabelas (Usuarios, Perfis, Permissoes, etc.) foram criados.
-
-Testar os Endpoints com Postman (ou SisInt.Backend.AuthService.http):
-
-Registro de Usuário (Sem Autenticação, se [AllowAnonymous]):
-Use o POST para http://localhost:5000/api/Usuario com um corpo JSON:
-
-JSON
-
-{
-    "username": "novo.usuario",
-    "email": "novo.usuario@sisint.com"
-}
-Você deve receber um 201 Created e os detalhes do novo usuário.
-
-Obter um token JWT do Keycloak (se ainda não tiver):
-No seu arquivo SisInt.Backend.AuthService.http, você já tem a requisição:
-
-HTTP
-
-POST http://localhost:8080/realms/sisint-realm/protocol/openid-connect/token
-Content-Type: application/x-www-form-urlencoded
-
-client_id=sisint-auth-service&grant_type=password&username=admin&password=@dm1N&client_secret=ylpwaJVLL0Ya3VeoSHtfPQUhVDbsy2F2
-Execute esta requisição para obter um token Bearer. Copie o access_token.
-
-Acessar Endpoint Protegido com Role "admin":
-Use GET para http://localhost:5000/api/Usuario.
-No cabeçalho Authorization, adicione Bearer [seu_token_aqui].
-Se o token do usuário admin tiver a role admin, você deverá ver a lista de usuários. Se não, receberá 403 Forbidden.
-
-Acessar Endpoint Protegido sem Role (ou com role diferente):
-Tente acessar http://localhost:5000/api/Usuario com um token que não tenha a role admin. Você deve receber 403 Forbidden.
-
-4. Implementar Autorização Baseada em Roles/Permissões
-A explicação sobre a configuração de roles no Keycloak e o mapeamento no .NET é clara e crucial.
-
 Críticas/Sugestões:
 
 RoleClaimType = "realm_access.roles": No Keycloak, a claim realm_access.roles é a forma mais comum de expor as roles atribuídas ao usuário no nível do realm.
@@ -320,9 +94,8 @@ RoleClaimType = "realm_access.roles": No Keycloak, a claim realm_access.roles é
 Ação: Verifique o token JWT (usando jwt.io) para confirmar exatamente onde suas roles estão (se em realm_access.roles ou resource_access.<client_id>.roles). Se for realm_access.roles, o .NET geralmente já faz esse mapeamento por padrão (quando a claim está na raiz), mas configurá-la explicitamente é uma boa prática para clareza e caso você precise de mapeamento mais complexo. Se estiver em resource_access, a configuração explícita é obrigatória.
 
 Mapeamento de Claims: Você já tem NameClaimType = "preferred_username", o que é um bom começo.
+-
 
-5. Executando e Testando 🧪
-As instruções para reconstruir as imagens Docker, subir os contêineres e testar com o Postman (ou .http) estão no caminho certo.
 
 Críticas/Sugestões:
 
