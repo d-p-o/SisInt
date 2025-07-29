@@ -1,4 +1,3 @@
-
 # SisInt - Sistema Integrado de Planejamento de Recursos Empresariais
 
 ---
