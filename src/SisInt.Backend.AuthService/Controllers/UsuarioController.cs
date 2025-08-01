@@ -10,24 +10,33 @@ namespace SisInt.Backend.AuthService.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize]
+    [Authorize] // Exige autenticação para todos os endpoints do controlador.
     public class UsuarioController(ApplicationDbContext context) : ControllerBase
     {
         private readonly ApplicationDbContext _context = context;
 
+        /// <summary>
+        /// Obtém todos os usuários.
+        /// </summary>
         [HttpGet]
-        [Authorize(Roles = "admin")]
+        [Authorize(Roles = "admin")] // Exige a role 'admin'.
         public async Task<ActionResult<IEnumerable<Usuario>>> GetUsuarios()
         {
             return Ok(await _context.Usuarios.ToListAsync());
         }
 
+        /// <summary>
+        /// Obtém um usuário por ID.
+        /// </summary>
+        /// <param name="id">O ID do usuário (Keycloak ID).</param>
         [HttpGet("{id}")]
-        [Authorize(Roles = "admin, user")]
+        [Authorize(Roles = "admin, user")] // Permite acesso para 'admin' ou 'user'.
         public async Task<ActionResult<Usuario>> GetUsuario(string id)
         {
+            // O 'sub' claim é o ID do usuário no Keycloak.
             var userIdClaim = User.Claims.FirstOrDefault(c => c.Type == "sub")?.Value;
 
+            // Permite acesso se o usuário for 'admin' ou se o ID solicitado for o seu próprio.
             if (User.IsInRole("admin") || (userIdClaim != null && userIdClaim == id))
             {
                 var usuario = await _context.Usuarios.FindAsync(id);
@@ -38,59 +47,6 @@ namespace SisInt.Backend.AuthService.Controllers
                 return Ok(usuario);
             }
             return Forbid("Você não tem permissão para acessar este recurso.");
-        }
-
-        [HttpPost]
-        [Authorize(Roles = "admin")]
-        public async Task<ActionResult<Usuario>> RegisterUsuario([FromBody] UsuarioRegisterDto usuarioDto)
-        {
-            if (string.IsNullOrWhiteSpace(usuarioDto.KeycloakId))
-            {
-                return BadRequest("O KeycloakId é obrigatório.");
-            }
-
-            if (await _context.Usuarios.AnyAsync(u => u.Id == usuarioDto.KeycloakId))
-            {
-                return Conflict("Um usuário com este KeycloakId já existe.");
-            }
-
-            var novoUsuario = new Usuario
-            {
-                Id = usuarioDto.KeycloakId,
-                Username = usuarioDto.Username,
-                Email = usuarioDto.Email,
-                EmailConfirmado = false,
-                DataCriacao = DateTime.UtcNow,
-                UsuarioPerfis = [],
-                LogAcessos = []
-            };
-
-            _context.Usuarios.Add(novoUsuario);
-            await _context.SaveChangesAsync();
-
-            _context.LogAcessos.Add(new LogAcesso
-            {
-                UsuarioId = novoUsuario.Id,
-                Usuario = novoUsuario,
-                DataAcesso = DateTime.UtcNow,
-                IPOrigem = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "N/A",
-                Detalhes = $"Usuário {novoUsuario.Username} registrado por administrador."
-            });
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction(nameof(GetUsuario), new { id = novoUsuario.Id }, novoUsuario);
-        }
-
-        public class UsuarioRegisterDto
-        {
-            [Required]
-            public required string Username { get; set; }
-            [Required]
-            [EmailAddress]
-            public required string Email { get; set; }
-
-            [Required]
-            public required string KeycloakId { get; set; }
         }
     }
 }

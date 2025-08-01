@@ -1,5 +1,8 @@
 ﻿namespace SisInt.Backend.AuthService.Models
 {
+    /// <summary>
+    /// Entidade de junção para o relacionamento muitos-para-muitos entre Usuario e Perfil.
+    /// </summary>
     public class UsuarioPerfil
     {
         public required string UsuarioId { get; set; }

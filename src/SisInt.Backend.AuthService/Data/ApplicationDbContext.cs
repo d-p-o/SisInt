@@ -5,6 +5,7 @@ namespace SisInt.Backend.AuthService.Data
 {
     public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : DbContext(options)
     {
+        // DbSets para mapear entidades para tabelas no banco de dados.
         public DbSet<Usuario> Usuarios { get; set; }
         public DbSet<Perfil> Perfis { get; set; }
         public DbSet<Permissao> Permissoes { get; set; }
@@ -14,9 +15,11 @@ namespace SisInt.Backend.AuthService.Data
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            modelBuilder.Entity<UsuarioPerfil>()
-                .HasKey(up => new { up.UsuarioId, up.PerfilId });
+            // Configurações para tabelas de junção com chaves compostas.
+            modelBuilder.Entity<UsuarioPerfil>().HasKey(up => new { up.UsuarioId, up.PerfilId });
+            modelBuilder.Entity<PermissaoPerfil>().HasKey(pp => new { pp.PermissaoId, pp.PerfilId });
 
+            // Configurações de relacionamento muitos-para-muitos para Usuario-Perfil.
             modelBuilder.Entity<UsuarioPerfil>()
                 .HasOne(up => up.Usuario)
                 .WithMany(u => u.UsuarioPerfis)
@@ -27,9 +30,7 @@ namespace SisInt.Backend.AuthService.Data
                 .WithMany(p => p.UsuarioPerfis)
                 .HasForeignKey(up => up.PerfilId);
 
-            modelBuilder.Entity<PermissaoPerfil>()
-                .HasKey(pp => new { pp.PermissaoId, pp.PerfilId });
-
+            // Configurações de relacionamento muitos-para-muitos para Permissao-Perfil.
             modelBuilder.Entity<PermissaoPerfil>()
                 .HasOne(pp => pp.Permissao)
                 .WithMany(p => p.PermissaoPerfis)

@@ -1,31 +1,24 @@
 @host = http://localhost:5000
-@access_token = {{$processEnv ACCESS_TOKEN}}
 
 ### Endpoint público (sem autenticação)
 GET {{host}}/TestAuth/public
 Accept: application/json
 
 ### Autenticação - Obter token JWT do Keycloak
+# Use este endpoint para obter um token JWT.
+# Copie o valor do 'access_token' da resposta e cole-o na variável abaixo.
 POST http://localhost:8080/realms/sisint-realm/protocol/openid-connect/token
 Content-Type: application/x-www-form-urlencoded
 
 client_id=sisint-auth-service&grant_type=password&username=admin&password=@dm1N&client_secret=ylpwaJVLL0Ya3VeoSHtfPQUhVDbsy2F2
 
+### Variável para armazenar o token de acesso
+@access_token = YOUR_ACCESS_TOKEN_HERE
+
 ### Endpoint protegido (exige token Bearer)
 GET {{host}}/TestAuth
 Authorization: Bearer {{access_token}}
 Accept: application/json
-
-### Registro de usuário (exige role 'admin')
-POST {{host}}/api/Usuario
-Content-Type: application/json
-Authorization: Bearer {{access_token}}
-
-{
-    "username": "novo.usuario.sincronizado",
-    "email": "novo.usuario.sincronizado@sisint.com",
-    "keycloakId": "37d7493f-71fd-414d-8407-0cc2d0cd4e2b"
-}
 
 ### Listar usuários (exige role 'admin')
 GET {{host}}/api/Usuario
@@ -33,8 +26,7 @@ Authorization: Bearer {{access_token}}
 Accept: application/json
 
 ### Obter usuário por ID (exige role 'admin' ou 'user')
+# O ID do usuário (Keycloak ID) é o 'sub' claim do token.
 GET {{host}}/api/Usuario/37d7493f-71fd-414d-8407-0cc2d0cd4e2b
 Authorization: Bearer {{access_token}}
 Accept: application/json
-
-# Response

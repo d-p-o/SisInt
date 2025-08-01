@@ -12,7 +12,7 @@ using SisInt.Backend.AuthService.Data;
 namespace SisInt.Backend.AuthService.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250801010010_InitialCreate")]
+    [Migration("20250801150526_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />

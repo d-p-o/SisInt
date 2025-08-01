@@ -1,92 +1,378 @@
 
-Olá Gemini, em pt/br e sem canvas, por favor!
+Olá Gemini, em pt/br por favor!
 
 O SisInt será um ERP (Enterprise Resource Planning) moderno, desenvolvido do zero com uma robusta arquitetura de microsserviços.
- Sua concepção visa flexibilidade, escalabilidade e resiliência, características essenciais para ambientes complexos.
-  Porém inicialmente ele é um projeto protótipo, com o objetivo de aprendizagem prática.
+ Sua concepção visa flexibilidade, escalabilidade e resiliência, características essenciais para ambientes complexos.
+  Porém inicialmente ele é um projeto protótipo, com o objetivo de aprendizagem prática.
 
 Visão Geral da Arquitetura e Tecnologias
- A base do SisInt é sua arquitetura de microsserviços, que promove modularidade e facilita o desenvolvimento e a manutenção. Para gerenciar as requisições entre esses serviços, o sistema utilizará o API Gateway Kong.
+ A base do SisInt é sua arquitetura de microsserviços, que promove modularidade e facilita o desenvolvimento e a manutenção. Para gerenciar as requisições entre esses serviços, o sistema utilizará o API Gateway Kong.
 
 As principais tecnologias que impulsionam o SisInt incluem:
- Back-end: Construído em .NET 8 com Entity Framework Core como ORM, conteinerizado com Docker.
- Front-end: Desenvolvido com React e Vite, também em contêiner Docker.
- Contêineres: A orquestração e o isolamento dos serviços são feitos via Docker, Docker Compose e Docker Desktop.
- Autenticação e Autorização: Gerenciadas pelo Keycloak, uma solução robusta de gestão de identidade e acesso, rodando em Docker.
- Banco de Dados: Microsoft SQL Server 2022, operando em Docker.
- Mensageria: Implementada com RabbitMQ em Docker para comunicação assíncrona entre os microsserviços.
- Comunicação em Tempo Real: Será integrada via SignalR para atualizações instantâneas.
- Banco de Dados NoSQL: Futuramente, será integrado o MongoDB.
+ Back-end: Construído em .NET 8 com Entity Framework Core como ORM, conteinerizado com Docker.
+ Front-end: Desenvolvido com React e Vite, também em contêiner Docker.
+ Contêineres: A orquestração e o isolamento dos serviços são feitos via Docker, Docker Compose e Docker Desktop.
+ Autenticação e Autorização: Gerenciadas pelo Keycloak, uma solução robusta de gestão de identidade e acesso, rodando em Docker.
+ Banco de Dados: Microsoft SQL Server 2022, operando em Docker.
+ Mensageria: Implementada com RabbitMQ em Docker para comunicação assíncrona entre os microsserviços.
+ Comunicação em Tempo Real: Será integrada via SignalR para atualizações instantâneas.
+ Banco de Dados NoSQL: Futuramente, será integrado o MongoDB.
 
 O projeto está organizado na seguinte estrutura de diretórios:
-  C:\Projetos\GitHub\SisInt\
-  ├── SisInt.sln
-  ├── docker-compose.yml
-  └── src/
-      ├── SisInt.Backend.AuthService/
-      │   ├── Dockerfile
-      │   ├── SisInt.Backend.AuthService.csproj
-      │   ├── Properties/
-      │   │   └── launchSettings.json
-      │   ├── Program.cs
-      │   ├── Controllers/
-      │   │   └── TestAuthController.cs
-      │   │   └── UsuarioController.cs
-      │   ├── SisInt.Backend.AuthService.http
-      │   ├── Data/
-      │   │   └── ApplicationDbContext.cs
-      │   └── Models/
-      │       ├── Usuario.cs
-      │       ├── Perfil.cs
-      │       ├── Permissao.cs
-      │       ├── UsuarioPerfil.cs
-      │       ├── PermissaoPerfil.cs
-      │       └── LogAcesso.cs
-      └── SisInt.Frontend/
-          ├── Dockerfile
-          └── package.json
+  C:\Projetos\GitHub\SisInt\
+  ├── SisInt.sln
+  ├── docker-compose.yml
+  └── src/
+      ├── SisInt.Backend.AuthService/
+      │   ├── Dockerfile
+      │   ├── SisInt.Backend.AuthService.csproj
+      │   ├── Properties/
+      │   │   └── launchSettings.json
+      │   ├── Program.cs
+      │   ├── Controllers/
+      │   │   └── TestAuthController.cs
+      │   │   └── UsuarioController.cs
+      │   ├── SisInt.Backend.AuthService.http
+      │   ├── Data/
+      │   │   └── ApplicationDbContext.cs
+      │   └── Models/
+      │       ├── Usuario.cs
+      │       ├── Perfil.cs
+      │       ├── Permissao.cs
+      │       ├── UsuarioPerfil.cs
+      │       ├── PermissaoPerfil.cs
+      │       └── LogAcesso.cs
+      └── SisInt.Frontend/
+          ├── Dockerfile
+          └── package.json
 
 As ferramentas atualmente configuradas e operacionais no ambiente Windows 11 Home (64 bits, Intel x64) são:
- Banco de Dados: Microsoft SQL Server 2022 com o banco de dados principal 'SisInt', acessível via SSMS 21 em localhost,1433 (u:sa / p:5@L0ca1h).
- Contêineres: Docker (v28.3.0), Docker Compose (v2.38.2) e Docker Desktop (4.43.2).
- IDE: Visual Studio 2022 Community (v17.14.8) com pacotes '.NET' (ASP/Web, Multiplataforma, Desktop).
- Back-end: .NET 8 LTS (SDK v9.0.302), com JwtBearer para autenticação e Swashbuckle para documentação de API.
- Front-end: Node.js (v22.17.0) e npm (v11.4.2) para desenvolvimento React com Vite.
- Segurança: Keycloak (realm: sisint-realm, client: sisint-auth-service, segredo: ylpwaJVLL0Ya3VeoSHtfPQUhVDbsy2F2, user: (u:admin p:@dm1N) e roles: admin, user e manager.
- Mensageria: RabbitMQ.
- Testes: Atualmente, são realizados testes manuais(http) e via Postman.
+ Contêineres: Docker (v28.3.0), Docker Compose (v2.38.2) e Docker Desktop (4.43.2).
+ IDE: Visual Studio 2022 Community (v17.14.8) com pacotes '.NET' (ASP/Web, Multiplataforma, Desktop).
+ Back-end: .NET 8 LTS (SDK v9.0.302), com JwtBearer para autenticação e Swashbuckle para documentação de API.
+ Front-end: Node.js (v22.17.0) e npm (v11.4.2) para desenvolvimento React com Vite.
+ Segurança: Keycloak (realm: sisint-realm, client: sisint-auth-service, segredo: ylpwaJVLL0Ya3VeoSHtfPQUhVDbsy2F2, user: (u:admin p:@dm1N) e roles: admin, user e manager.
+ Banco de Dados: Microsoft SQL Server 2022 com o banco de dados principal 'SisInt', acessível via SSMS 21 em localhost,1433 (u:sa / p:5@L0ca1h).
+  Tabelas: Usuarios, Perfis, Permissoes, UsuarioPerfis, PermissaoPerfis e LogAcessos. Porén o Keycloak que é a fonte de verdade.
+ Mensageria: RabbitMQ.
+ Testes: Atualmente, são realizados testes manuais(http) e via Postman.
 
 Os seguintes serviços estão ativos e acessíveis via Docker Compose:
- auth-service: sisint-auth-service (Back-end), rodando em 0.0.0.0:5000 (HTTP) e 0.0.0.0:5001 (HTTPS).
- frontend: sisint-frontend (Front-end), acessível em 0.0.0.0:5173.
- keycloak: quay.io/keycloak/keycloak:latest, disponível em 0.0.0.0:8080.
- rabbitmq: rabbitmq:3-management-alpine, com interface de gerenciamento em 0.0.0.0:15672.
- sql: mcr.microsoft.com/mssql/server:2022-latest, acessível em 0.0.0.0:1433.
+ auth-service: sisint-auth-service (Back-end), rodando em 0.0.0.0:5000 (HTTP) e 0.0.0.0:5001 (HTTPS).
+ frontend: sisint-frontend (Front-end), acessível em 0.0.0.0:5173.
+ keycloak: quay.io/keycloak/keycloak:latest, disponível em 0.0.0.0:8080.
+ rabbitmq: rabbitmq:3-management-alpine, com interface de gerenciamento em 0.0.0.0:15672.
+ sql: mcr.microsoft.com/mssql/server:2022-latest, acessível em 0.0.0.0:1433.
 
 Endereços para Acesso:
- Keycloak: http://keycloak:8080/ (ou via 127.0.0.1 no hosts para 'keycloak'). (u:admin / p:admin)
- RabbitMQ (Gerenciamento): http://localhost:15672/. (u:guest / p:guest)
- Front-end: http://localhost:5173/.
+ Keycloak: http://keycloak:8080/ (ou via 127.0.0.1 no hosts para 'keycloak'). (u:admin / p:admin)
+ RabbitMQ (Gerenciamento): http://localhost:15672/. (u:guest / p:guest)
+ Front-end: http://localhost:5173/.
 
 Testes Manuais e Resultados
- POST http://localhost:8080/realms/sisint-realm/protocol/openid-connect/token: OK (Obtenção de Token Keycloak)
- GET http://localhost:5000/TestAuth/public: OK (Acesso a Endpoint Público)
- GET http://localhost:5000/TestAuth: OK (Acesso a Endpoint Protegido)
- POST http://localhost:5000/api/Usuario: JOB (Registro de Usuário)
- GET http://localhost:5000/api/Usuario: JOB (Listagem de Usuários)
- GET http://localhost:5000/api/Usuario/{usuario_id}: JOB (Obtenção de Usuário por ID)
+ POST http://localhost:8080/realms/sisint-realm/protocol/openid-connect/token: OK (Token JWT gerado com sucesso)
+ GET http://localhost:5000/TestAuth/public: OK (Endpoint público acessível)
+ GET http://localhost:5000/TestAuth: OK (Endpoint protegido acessível com token)
+ GET http://localhost:5000/api/Usuario: OK (Retornou uma lista vazia, pois não há usuários sincronizados)
+ GET http://localhost:5000/api/Usuario/{usuario_id}: 404 Not Found (Usuário não encontrado no banco de dados local)
 
 Próximos Passos e Integrações
- O roadmap do SisInt foca na integração e configuração de componentes essenciais para a sua funcionalidade completa:
-  Integração de Segurança: Estabelecer a comunicação completa e segura entre Keycloak, Front-end e Back-end.
-  API Gateway: Configurar e implantar o Kong como o ponto de entrada central para todos os microsserviços.
-  Integração de Mensageria: Aprofundar a integração com RabbitMQ para comunicação assíncrona.
-  Comunicação em Tempo Real: Incorporar o SignalR para funcionalidades interativas e atualizações instantâneas.
-  Testes Automatizados: Implementar xUnit para testes unitários/integrados no Back-end e Vitest para o Front-end.
-  NoSQL: Integrar o MongoDB para necessidades específicas de armazenamento.
+ O roadmap do SisInt foca na integração e configuração de componentes essenciais para a sua funcionalidade completa:
+  Integração de Segurança: Estabelecer a comunicação completa e segura entre Keycloak, Front-end e Back-end.
+  API Gateway: Configurar e implantar o Kong como o ponto de entrada central para todos os microsserviços.
+  Integração de Mensageria: Aprofundar a integração com RabbitMQ para comunicação assíncrona.
+  Comunicação em Tempo Real: Incorporar o SignalR para funcionalidades interativas e atualizações instantâneas.
+  Testes Automatizados: Implementar xUnit para testes unitários/integrados no Back-end e Vitest para o Front-end.
+  NoSQL: Integrar o MongoDB para necessidades específicas de armazenamento.
 
 O SisInt avança como um futuro ERP robusto e eficiente, com uma base tecnológica sólida e um plano claro para sua evolução.
 -
+
+
+É uma excelente decisão! A abordagem de sincronização combina o melhor dos dois mundos: a robustez do Keycloak para gerenciamento de identidade e o desempenho de ter dados relevantes localmente para a aplicação.
+
+Agora, com o backend preparado para interagir com o Keycloak, a próxima etapa é a integração com o frontend. Vamos seguir um plano claro e didático para que você possa implementar essa funcionalidade no seu projeto React.
+
+Foco Atual: Integrando o Frontend (React com Vite) com o Keycloak
+O nosso objetivo nesta fase é configurar o projeto SisInt.Frontend para se comunicar com o Keycloak. Isso permitirá que os usuários façam login e que a nossa aplicação React gerencie as sessões de forma segura, incluindo o envio do token de autenticação para o nosso backend.
+
+Vamos dividir o trabalho em três etapas principais:
+
+Instalação da Biblioteca keycloak-js: Adicionar a dependência necessária ao seu projeto.
+
+Configuração e Inicialização do Keycloak: Criar um arquivo de configuração para conectar a aplicação ao Keycloak.
+
+Implementação do Fluxo de Autenticação: Escrever o código que gerencia o login, logout e o estado do usuário na aplicação.
+
+Passo 1: Instalação da Biblioteca de Autenticação
+A primeira coisa a fazer é adicionar a biblioteca oficial do Keycloak para JavaScript, que simplifica todo o processo de autenticação.
+
+Instruções Detalhadas:
+Abra um terminal na pasta do seu projeto frontend (src/SisInt.Frontend).
+
+Execute o seguinte comando para instalar o keycloak-js:
+
+Bash
+
+npm install keycloak-js
+Após a execução, a biblioteca será adicionada ao seu arquivo package.json, e você estará pronto para usá-la.
+
+Passo 2: Configuração e Inicialização do Keycloak
+Agora, vamos criar um arquivo de configuração para informar à biblioteca keycloak-js como se conectar ao seu servidor Keycloak.
+
+Instruções Detalhadas:
+No diretório src/SisInt.Frontend/src, crie um novo arquivo chamado keycloak.ts ou keycloak.js. Recomendo usar TypeScript (.ts) para ter a tipagem correta.
+
+Adicione o seguinte código a este novo arquivo:
+
+TypeScript
+
+import Keycloak from 'keycloak-js';
+
+// Configuração do Keycloak para o ambiente de desenvolvimento
+const keycloakConfig = {
+  url: 'http://localhost:8080', // URL base do Keycloak
+  realm: 'sisint-realm',       // O realm que criamos
+  clientId: 'sisint-frontend',  // O ID do cliente que registraremos no Keycloak
+};
+
+// Inicializa a instância do Keycloak
+const keycloak = new Keycloak(keycloakConfig);
+
+export default keycloak;
+Documentação do Código:
+
+import Keycloak from 'keycloak-js';: Importa a classe principal da biblioteca.
+
+keycloakConfig: Um objeto de configuração que contém as informações essenciais para a conexão.
+
+url: O endereço onde o Keycloak está rodando. No seu caso, http://localhost:8080.
+
+realm: O nome do seu realm, que é sisint-realm.
+
+clientId: Um identificador para o nosso cliente frontend. Vamos usar sisint-frontend e precisaremos registrá-lo no Keycloak mais tarde.
+
+const keycloak = new Keycloak(keycloakConfig);: Cria uma instância do cliente Keycloak com a nossa configuração.
+
+export default keycloak;: Exporta a instância para que possa ser usada em qualquer outro lugar da sua aplicação.
+
+Passo 3: Implementação do Fluxo de Autenticação na Aplicação
+Com a biblioteca instalada e configurada, a próxima etapa é integrar o fluxo de login na sua aplicação React. Faremos isso no arquivo principal, src/SisInt.Frontend/src/main.tsx.
+
+Instruções Detalhadas:
+Abra o arquivo src/SisInt.Frontend/src/main.tsx.
+
+Importe o cliente Keycloak que você acabou de criar.
+
+TypeScript
+
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import App from './App.tsx'
+import './index.css'
+import keycloak from './keycloak.ts'; // Importe a instância do Keycloak
+Implemente a lógica de inicialização do Keycloak para que o fluxo de autenticação seja iniciado antes de renderizar a sua aplicação. Usaremos um bloco try-catch para lidar com erros.
+
+TypeScript
+
+// ... imports
+
+const root = ReactDOM.createRoot(document.getElementById('root')!);
+
+// Inicializa o Keycloak antes de renderizar o aplicativo
+keycloak.init({ onLoad: 'login-required' }).then(authenticated => {
+  if (authenticated) {
+    console.log('Usuário autenticado com sucesso!');
+    // Se o usuário está autenticado, renderiza a aplicação
+    root.render(
+      <React.StrictMode>
+        <App />
+      </React.StrictMode>
+    );
+  } else {
+    // Se o usuário não está autenticado, a página de login do Keycloak já foi exibida
+    console.log('O usuário não está autenticado.');
+  }
+}).catch(error => {
+  console.error('Falha ao inicializar o Keycloak:', error);
+});
+Documentação do Código:
+
+keycloak.init({ onLoad: 'login-required' }): Este é o comando mais importante. Ele inicializa o cliente Keycloak.
+
+onLoad: 'login-required': Esta opção instrui o Keycloak a redirecionar o usuário para a página de login se ele ainda não estiver autenticado. É o comportamento ideal para uma aplicação que exige autenticação.
+
+.then(authenticated => { ... }): Esta promessa é resolvida após a inicialização do Keycloak. O valor authenticated é um booleano que indica se o usuário está logado.
+
+if (authenticated) { ... }: Se o usuário já passou pelo login, a aplicação (<App />) é renderizada normalmente. O token de acesso já estará disponível na instância keycloak.
+
+catch(error => { ... }): Trata qualquer erro que possa ocorrer durante a inicialização, como problemas de conexão com o Keycloak.
+
+Próximos Passos:
+Após implementar este código, ao rodar a sua aplicação React, você será automaticamente redirecionado para a página de login do Keycloak. No entanto, para que o fluxo funcione corretamente, você precisará configurar o cliente sisint-frontend no painel de administração do Keycloak, o que faremos na próxima etapa.
+
+Aguarde o seu comando para continuar. Estou aqui para te ajudar a criar essa nova configuração.
+------
+
+
+
+visão de ter um fluxo de sincronização é a mais robusta e eficiente para a maioria dos casos. Você tem toda a razão, precisamos combinar o melhor dos dois mundos.
+
+O fluxo ideal, como você descreveu, seria:
+
+Primeiro Acesso/Sincronização: Quando um novo usuário é identificado, a nossa API faz uma busca no Keycloak para validar a sua existência.
+
+Criação no BD Local: Se o usuário existe no Keycloak, criamos um registro correspondente no nosso banco de dados SQL. A partir desse momento, o nosso banco de dados se torna a fonte de verdade para as informações específicas da nossa aplicação (perfis, logs, etc.).
+
+Operações Futuras: Todas as próximas requisições para obter ou listar usuários serão mais rápidas, pois buscarão as informações diretamente no nosso banco de dados SQL, sem a necessidade de fazer uma nova chamada externa ao Keycloak.
+
+Vamos ajustar o nosso código para refletir essa abordagem. A ideia é a seguinte: o endpoint POST /api/Usuario será o responsável por essa sincronização inicial.
+
+Passo 1: Manter a estrutura de comunicação com o Keycloak
+O KeycloakAdminClient e o KeycloakUserDto que criamos na resposta anterior são perfeitos para este trabalho. Vamos mantê-los.
+
+Passo 2: Atualizar o Program.cs para suportar os dois serviços
+Precisamos garantir que tanto o nosso DbContext quanto o novo KeycloakAdminClient sejam injetados corretamente no nosso controller.
+
+C#
+
+// Código do Program.cs (atualizado)
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
+using System.Security.Claims;
+using System.Text.Json;
+using Microsoft.AspNetCore.Authorization;
+using SisInt.Backend.AuthService.Data;
+using Microsoft.EntityFrameworkCore;
+using System.Text.Json.Serialization;
+using SisInt.Backend.AuthService; // Adicione o namespace para o nosso novo cliente
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Configura o Kestrel para ouvir na porta 80, ideal para o ambiente Docker.
+builder.WebHost.UseUrls("http://*:80");
+
+// Adiciona os serviços ao contêiner de Injeção de Dependência.
+builder.Services.AddDbContext<ApplicationDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+// Adiciona o nosso novo cliente para comunicação com a API de Administração do Keycloak.
+builder.Services.AddSingleton<KeycloakAdminClient>(); // Usamos Singleton, pois não tem estado.
+
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.Preserve;
+    });
+
+// (Resto do código de autenticação, autorização e Swagger)
+// ...
+Passo 3: Modificar o UsuarioController.cs
+Vamos injetar os dois serviços (ApplicationDbContext e KeycloakAdminClient) e ajustar o método POST para fazer a validação no Keycloak antes de salvar no nosso banco. Os métodos GET voltarão à lógica original, que busca no nosso banco de dados.
+
+C#
+
+// Código do UsuarioController.cs (atualizado)
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using SisInt.Backend.AuthService.Data;
+using SisInt.Backend.AuthService.Models;
+using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
+using System.ComponentModel.DataAnnotations;
+
+namespace SisInt.Backend.AuthService.Controllers
+{
+    [ApiController]
+    [Route("api/[controller]")]
+    [Authorize]
+    public class UsuarioController(ApplicationDbContext context, KeycloakAdminClient keycloakAdminClient) : ControllerBase
+    {
+        private readonly ApplicationDbContext _context = context;
+        private readonly KeycloakAdminClient _keycloakAdminClient = keycloakAdminClient;
+
+        [HttpGet]
+        [Authorize(Roles = "admin")]
+        public async Task<ActionResult<IEnumerable<Usuario>>> GetUsuarios()
+        {
+            // A busca agora é feita no nosso banco de dados local, como você solicitou.
+            return Ok(await _context.Usuarios.ToListAsync());
+        }
+
+        [HttpGet("{id}")]
+        [Authorize(Roles = "admin, user")]
+        public async Task<ActionResult<Usuario>> GetUsuario(string id)
+        {
+            var userIdClaim = User.Claims.FirstOrDefault(c => c.Type == "sub")?.Value;
+
+            if (User.IsInRole("admin") || (userIdClaim != null && userIdClaim == id))
+            {
+                var usuario = await _context.Usuarios.FindAsync(id);
+                if (usuario == null)
+                {
+                    // A requisição falha aqui, pois o usuário ainda não foi sincronizado.
+                    return NotFound("Usuário não encontrado.");
+                }
+                return Ok(usuario);
+            }
+            return Forbid("Você não tem permissão para acessar este recurso.");
+        }
+
+        [HttpPost]
+        [Authorize(Roles = "admin")]
+        public async Task<ActionResult<Usuario>> RegisterUsuario(UsuarioRegisterDto usuarioDto)
+        {
+            // Primeiro, vamos verificar se o usuário existe no Keycloak.
+            var keycloakUser = await _keycloakAdminClient.GetUserById(usuarioDto.KeycloakId);
+            if (keycloakUser == null)
+            {
+                return BadRequest("O usuário não existe no Keycloak. Por favor, crie-o lá primeiro.");
+            }
+
+            if (await _context.Usuarios.AnyAsync(u => u.Id == usuarioDto.KeycloakId))
+            {
+                return Conflict("Um usuário com este KeycloakId já existe.");
+            }
+
+            var novoUsuario = new Usuario
+            {
+                Id = usuarioDto.KeycloakId,
+                Username = keycloakUser.Username, // Usamos os dados do Keycloak como fonte
+                Email = keycloakUser.Email,
+                EmailConfirmado = keycloakUser.EmailVerified,
+                DataCriacao = DateTime.UtcNow,
+                UsuarioPerfis = [],
+                LogAcessos = []
+            };
+
+            _context.Usuarios.Add(novoUsuario);
+            await _context.SaveChangesAsync();
+            
+            // Adicionar log de acesso...
+            // ...
+
+            return CreatedAtAction(nameof(GetUsuario), new { id = novoUsuario.Id }, novoUsuario);
+        }
+
+        public class UsuarioRegisterDto
+        {
+            [Required]
+            public required string KeycloakId { get; set; }
+        }
+    }
+}
+Explicação da mudança:
+
+O método RegisterUsuario agora recebe apenas o KeycloakId.
+
+Ele chama o novo método GetUserById do KeycloakAdminClient para verificar a existência do usuário no Keycloak. Se não existir, retorna um erro 400 Bad Request.
+
+Se o usuário existe no Keycloak, a API usa os dados validados (keycloakUser.Username, keycloakUser.Email, etc.) para criar o registro no nosso banco de dados.
+
+Com esta abordagem, a nossa API continua robusta. Se o POST para registrar um usuário for bem-sucedido, o GET subsequente encontrará o registro no nosso banco de dados e funcionará como esperado.
+
+
 
 
 Foco Atual da Assistência: Integração do Keycloak com o Frontend (React)

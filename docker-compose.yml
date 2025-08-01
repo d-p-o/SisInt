@@ -45,8 +45,9 @@ services:
       ACCEPT_EULA: "Y"
     healthcheck:
       test: ["CMD", "/opt/mssql-tools/bin/sqlcmd", "-S", "localhost", "-U", "sa", "-P", "5@L0ca1h", "-Q", "SELECT 1"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
+      start_period: 5s
       retries: 5
     networks:
       - sisint-network

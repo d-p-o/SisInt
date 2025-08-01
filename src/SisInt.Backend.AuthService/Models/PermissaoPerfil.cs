@@ -1,5 +1,8 @@
 ﻿namespace SisInt.Backend.AuthService.Models
 {
+    /// <summary>
+    /// Entidade de junção para o relacionamento muitos-para-muitos entre Permissao e Perfil.
+    /// </summary>
     public class PermissaoPerfil
     {
         public int PermissaoId { get; set; }

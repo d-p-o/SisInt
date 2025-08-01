@@ -9,8 +9,11 @@ namespace SisInt.Backend.AuthService.Controllers
     [Route("[controller]")]
     public class TestAuthController : ControllerBase
     {
+        /// <summary>
+        /// Endpoint protegido que retorna dados do usuário autenticado.
+        /// </summary>
         [HttpGet]
-        [Authorize]
+        [Authorize] // Exige autenticação.
         public IActionResult GetAuthenticatedData()
         {
             var userName = User.Claims.FirstOrDefault(c => c.Type == "preferred_username")?.Value;
@@ -23,6 +26,9 @@ namespace SisInt.Backend.AuthService.Controllers
                       $"Você está autenticado com sucesso!");
         }
 
+        /// <summary>
+        /// Endpoint público que não exige autenticação.
+        /// </summary>
         [HttpGet("public")]
         public IActionResult GetPublicData()
         {

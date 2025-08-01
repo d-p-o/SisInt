@@ -2,6 +2,9 @@
 
 namespace SisInt.Backend.AuthService.Models
 {
+    /// <summary>
+    /// Entidade para registrar os acessos de usuários à aplicação.
+    /// </summary>
     public class LogAcesso
     {
         [Key]

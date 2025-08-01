@@ -46,12 +46,13 @@ As principais tecnologias que impulsionam o SisInt incluem:
 
 As ferramentas atualmente configuradas e operacionais no ambiente **Windows 11 Home (64 bits, Intel x64)** são:
 
-* **Banco de Dados:** **Microsoft SQL Server 2022** (banco 'SisInt') acessível via SSMS 21 em `localhost,1433` (usuário: `sa` / senha: `5@L0ca1h`).
 * **Contêineres:** **Docker** (v28.3.0), **Docker Compose** (v2.38.2) e **Docker Desktop** (4.43.2).
 * **IDE:** **Visual Studio 2022 Community** (v17.14.8) com pacotes '.NET' (ASP/Web, Multiplataforma, Desktop).
 * **Back-end:** **.NET Core 8 LTS** (SDK v9.0.302).
 * **Front-end:** **Node.js** (v22.17.0) e **npm** (v11.4.2).
 * **Segurança:** **Keycloak** (realm: `sisint-realm`, client: `sisint-auth-service`, user: `admin` / `@dm1N`). **O AuthService está configurado para reconhecer e aplicar roles do Keycloak (ex: admin, user, manager) via JWT.**
+* **Banco de Dados:** **Microsoft SQL Server 2022** (banco 'SisInt') acessível via SSMS 21 em `localhost,1433` (usuário: `sa` / senha: `5@L0ca1h`).
+*  **Tabelas:** Usuarios, Perfis, Permissoes, UsuarioPerfis, PermissaoPerfis e LogAcessos. Porén o Keycloak que é a fonte de **verdade**.
 * **Mensageria:** **RabbitMQ**.
 * **Testes:** Atualmente, testes manuais são realizados por **HTTP** na solução e via **Postman**.
 
@@ -79,12 +80,11 @@ Os seguintes serviços estão configurados e podem ser acessados após levantar 
 
 ## ✅ Testes Manuais e Resultados
 
-* `POST http://localhost:8080/realms/sisint-realm/protocol/openid-connect/token`: **OK** (Obtenção de Token Keycloak)
-* `GET http://localhost:5000/TestAuth/public`: **OK** (Acesso a Endpoint Público)
-* `GET http://localhost:5000/TestAuth`: **OK** (Acesso a Endpoint Protegido)
-* `POST http://localhost:5000/api/Usuario`: **JOB** (Registro de Usuário)
-* `GET http://localhost:5000/api/Usuario`: **JOB** (Listagem de Usuários)
-* `GET http://localhost:5000/api/Usuario/{usuario_id}`: **JOB** (Obtenção de Usuário por ID)
+* `POST http://localhost:8080/realms/sisint-realm/protocol/openid-connect/token`: **OK** (Token JWT gerado com sucesso)
+* `GET http://localhost:5000/TestAuth/public`: **OK** (Endpoint público acessível)
+* `GET http://localhost:5000/TestAuth`: **OK** (Endpoint protegido acessível com token)
+* `GET http://localhost:5000/api/Usuario`: **OK** (Retornou uma lista vazia, pois não há usuários sincronizados)
+* `GET http://localhost:5000/api/Usuario/{usuario_id}`: **404 Not Found** (Usuário não encontrado no banco de dados local)
 
 ---
 
