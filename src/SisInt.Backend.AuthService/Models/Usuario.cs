@@ -6,13 +6,17 @@ namespace SisInt.Backend.AuthService.Models
     public class Usuario
     {
         [Key]
-        public Guid Id { get; set; }
+        [MaxLength(36)]
+        public required string Id { get; set; }
+
         [Required]
         [MaxLength(256)]
         public required string Username { get; set; }
+
         [Required]
         [MaxLength(256)]
         public required string Email { get; set; }
+
         public bool EmailConfirmado { get; set; }
         public DateTime DataCriacao { get; set; } = DateTime.UtcNow;
 

@@ -1,4 +1,5 @@
 @host = http://localhost:5000
+@access_token = {{$processEnv ACCESS_TOKEN}}
 
 ### Endpoint público (sem autenticação)
 GET {{host}}/TestAuth/public
@@ -15,13 +16,15 @@ GET {{host}}/TestAuth
 Authorization: Bearer {{access_token}}
 Accept: application/json
 
-### Registro de usuário (sem autenticação, se AllowAnonymous)
+### Registro de usuário (exige role 'admin')
 POST {{host}}/api/Usuario
 Content-Type: application/json
+Authorization: Bearer {{access_token}}
 
 {
-    "username": "novo.usuario",
-    "email": "novo.usuario@sisint.com"
+    "username": "novo.usuario.sincronizado",
+    "email": "novo.usuario.sincronizado@sisint.com",
+    "keycloakId": "37d7493f-71fd-414d-8407-0cc2d0cd4e2b"
 }
 
 ### Listar usuários (exige role 'admin')

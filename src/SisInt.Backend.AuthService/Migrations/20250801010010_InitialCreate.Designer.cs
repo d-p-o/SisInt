@@ -12,7 +12,7 @@ using SisInt.Backend.AuthService.Data;
 namespace SisInt.Backend.AuthService.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250723200606_InitialCreate")]
+    [Migration("20250801010010_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -46,8 +46,10 @@ namespace SisInt.Backend.AuthService.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
-                    b.Property<Guid>("UsuarioId")
-                        .HasColumnType("uniqueidentifier");
+                    b.Property<string>("UsuarioId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("nvarchar(36)");
 
                     b.HasKey("Id");
 
@@ -119,9 +121,9 @@ namespace SisInt.Backend.AuthService.Migrations
 
             modelBuilder.Entity("SisInt.Backend.AuthService.Models.Usuario", b =>
                 {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
+                    b.Property<string>("Id")
+                        .HasMaxLength(36)
+                        .HasColumnType("nvarchar(36)");
 
                     b.Property<DateTime>("DataCriacao")
                         .HasColumnType("datetime2");
@@ -146,8 +148,8 @@ namespace SisInt.Backend.AuthService.Migrations
 
             modelBuilder.Entity("SisInt.Backend.AuthService.Models.UsuarioPerfil", b =>
                 {
-                    b.Property<Guid>("UsuarioId")
-                        .HasColumnType("uniqueidentifier");
+                    b.Property<string>("UsuarioId")
+                        .HasColumnType("nvarchar(36)");
 
                     b.Property<int>("PerfilId")
                         .HasColumnType("int");

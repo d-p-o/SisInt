@@ -43,7 +43,7 @@ namespace SisInt.Backend.AuthService.Migrations
                 name: "Usuarios",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    Id = table.Column<string>(type: "nvarchar(36)", maxLength: 36, nullable: false),
                     Username = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: false),
                     Email = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: false),
                     EmailConfirmado = table.Column<bool>(type: "bit", nullable: false),
@@ -84,7 +84,7 @@ namespace SisInt.Backend.AuthService.Migrations
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    UsuarioId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    UsuarioId = table.Column<string>(type: "nvarchar(36)", maxLength: 36, nullable: false),
                     DataAcesso = table.Column<DateTime>(type: "datetime2", nullable: false),
                     IPOrigem = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
                     Detalhes = table.Column<string>(type: "nvarchar(250)", maxLength: 250, nullable: false)
@@ -104,7 +104,7 @@ namespace SisInt.Backend.AuthService.Migrations
                 name: "UsuarioPerfis",
                 columns: table => new
                 {
-                    UsuarioId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    UsuarioId = table.Column<string>(type: "nvarchar(36)", nullable: false),
                     PerfilId = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>

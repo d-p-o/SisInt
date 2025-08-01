@@ -14,15 +14,8 @@ namespace SisInt.Backend.AuthService.Controllers
         public IActionResult GetAuthenticatedData()
         {
             var userName = User.Claims.FirstOrDefault(c => c.Type == "preferred_username")?.Value;
-
-            if (string.IsNullOrEmpty(userName))
-            {
-                userName = User.Identity?.Name;
-            }
-
-            var userId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
-
-            var userEmail = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Email)?.Value;
+            var userId = User.Claims.FirstOrDefault(c => c.Type == "sub")?.Value;
+            var userEmail = User.Claims.FirstOrDefault(c => c.Type == "email")?.Value;
 
             return Ok($"Olá, {userName ?? "Usuário Anônimo"}! " +
                       $"Seu ID de usuário é: {userId ?? "Não disponível"}. " +

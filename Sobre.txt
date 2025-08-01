@@ -1,7 +1,9 @@
 
 Olá Gemini, em pt/br e sem canvas, por favor!
 
-O SisInt será um ERP (Enterprise Resource Planning) moderno, desenvolvido do zero com uma robusta arquitetura de microsserviços. Sua concepção visa flexibilidade, escalabilidade e resiliência, características essenciais para ambientes complexos.
+O SisInt será um ERP (Enterprise Resource Planning) moderno, desenvolvido do zero com uma robusta arquitetura de microsserviços.
+ Sua concepção visa flexibilidade, escalabilidade e resiliência, características essenciais para ambientes complexos.
+  Porém inicialmente ele é um projeto protótipo, com o objetivo de aprendizagem prática.
 
 Visão Geral da Arquitetura e Tecnologias
  A base do SisInt é sua arquitetura de microsserviços, que promove modularidade e facilita o desenvolvimento e a manutenção. Para gerenciar as requisições entre esses serviços, o sistema utilizará o API Gateway Kong.
@@ -70,81 +72,20 @@ Testes Manuais e Resultados
  POST http://localhost:8080/realms/sisint-realm/protocol/openid-connect/token: OK (Obtenção de Token Keycloak)
  GET http://localhost:5000/TestAuth/public: OK (Acesso a Endpoint Público)
  GET http://localhost:5000/TestAuth: OK (Acesso a Endpoint Protegido)
- POST http://localhost:5000/api/Usuario: OK (Registro de Usuário)
- GET http://localhost:5000/api/Usuario: OK (Listagem de Usuários)
- GET http://localhost:5000/api/Usuario/{usuario_id}: OK (Obtenção de Usuário por ID)
+ POST http://localhost:5000/api/Usuario: JOB (Registro de Usuário)
+ GET http://localhost:5000/api/Usuario: JOB (Listagem de Usuários)
+ GET http://localhost:5000/api/Usuario/{usuario_id}: JOB (Obtenção de Usuário por ID)
 
 Próximos Passos e Integrações
  O roadmap do SisInt foca na integração e configuração de componentes essenciais para a sua funcionalidade completa:
   Integração de Segurança: Estabelecer a comunicação completa e segura entre Keycloak, Front-end e Back-end.
-  Testes Automatizados: Implementar xUnit para testes unitários/integrados no Back-end e Vitest para o Front-end.
   API Gateway: Configurar e implantar o Kong como o ponto de entrada central para todos os microsserviços.
   Integração de Mensageria: Aprofundar a integração com RabbitMQ para comunicação assíncrona.
   Comunicação em Tempo Real: Incorporar o SignalR para funcionalidades interativas e atualizações instantâneas.
+  Testes Automatizados: Implementar xUnit para testes unitários/integrados no Back-end e Vitest para o Front-end.
   NoSQL: Integrar o MongoDB para necessidades específicas de armazenamento.
 
 O SisInt avança como um futuro ERP robusto e eficiente, com uma base tecnológica sólida e um plano claro para sua evolução.
--
-
-
-Críticas/Sugestões:
-
-RoleClaimType = "realm_access.roles": No Keycloak, a claim realm_access.roles é a forma mais comum de expor as roles atribuídas ao usuário no nível do realm.
-
-Ação: Verifique o token JWT (usando jwt.io) para confirmar exatamente onde suas roles estão (se em realm_access.roles ou resource_access.<client_id>.roles). Se for realm_access.roles, o .NET geralmente já faz esse mapeamento por padrão (quando a claim está na raiz), mas configurá-la explicitamente é uma boa prática para clareza e caso você precise de mapeamento mais complexo. Se estiver em resource_access, a configuração explícita é obrigatória.
-
-Mapeamento de Claims: Você já tem NameClaimType = "preferred_username", o que é um bom começo.
--
-
-
-Críticas/Sugestões:
-
-docker compose build auth-service: Lembre-se de executar este comando sempre que houver mudanças no Dockerfile, csproj ou nos arquivos de código-fonte que afetam o build do Docker.
-
-Testes de Autorização: Testar os endpoints com diferentes tokens (com e sem a role admin) é essencial para validar se a autorização está funcionando como esperado.
-
-Próximas Ações Essenciais (Com base na sua decisão de manter o status quo para desenvolvimento):
-Revisar UsuarioRegisterDto e Lógica de Registro:
-
-Se você quer que o RegisterUsuario crie usuários tanto no Keycloak quanto no seu DB local, ele precisará fazer uma chamada para a API Admin do Keycloak para criar o usuário lá primeiro, e então persistir os dados no seu DB local (com o Id vindo do Keycloak, não um NewGuid()). Isso tornaria o fluxo mais coerente.
-
-Se RegisterUsuario for apenas para "sincronizar" usuários que já existem no Keycloak, ele deve ser [Authorize(Roles = "admin")] e receber o Id do Keycloak como parte do DTO.
-
-Pense: Quem será o "mestre" para a criação de usuários? Atualmente, parece haver duas formas de criar usuários que não se conversam.
-
-Verificar Mapeamento de Roles:
-
-Mais importante: Após obter um token do Keycloak, cole-o em jwt.io e verifique a seção de claims. Procure por realm_access e resource_access. Se suas roles estiverem dentro de realm_access.roles ou resource_access.<client_id>.roles, ajuste (se necessário) a propriedade RoleClaimType no Program.cs para garantir que o .NET reconheça suas roles corretamente. Isso é vital para que [Authorize(Roles = "admin")] funcione.
-
-Limpeza do launchSettings.json (Opcional):
-
-Se você vai usar o Docker Compose para rodar o serviço na maioria das vezes, o launchSettings.json se torna menos relevante. Você pode remover os launchBrowser para weatherforecast ou ajustar para algo que faz sentido para seu serviço de autenticação.
-
-O caminho que você está seguindo é sólido para o desenvolvimento. A principal "armadilha" agora é a gestão da identidade do usuário com o Keycloak e o seu banco de dados local. Resolvendo isso, o resto fluirá muito bem!
-
-Duplicação de Dados do Usuário (Usuario Model): Este é o ponto mais crítico, como mencionei anteriormente, mas agora com a implementação em mente.
-
-O seu UsuarioController permite registrar e consultar usuários em um banco de dados local (SisInt.Backend.AuthService.Data.ApplicationDbContext).
-
-No entanto, você está usando o Keycloak como provedor de autenticação, que já gerencia usuários.
-
-Problema: Se um usuário se registra no Keycloak, ele não aparecerá automaticamente na sua tabela Usuarios local. Se ele se registra via seu RegisterUsuario (com [AllowAnonymous]), ele não aparecerá no Keycloak. Isso cria uma inconsistência séria na fonte da verdade para os dados do usuário.
-
-Sugestão Essencial:
-
-Decida: Onde está a fonte primária dos dados do usuário?
-
-Se Keycloak for a fonte primária: A tabela Usuario no seu banco de dados local deve servir apenas para armazenar informações complementares ao usuário do Keycloak que sejam específicas da sua aplicação (ex: preferências, configurações de notificação). Você precisaria de um mecanismo para sincronizar o ID (sub) do usuário do Keycloak com um campo no seu modelo Usuario local, e não ter um Id = Guid.NewGuid() aleatório. O endpoint RegisterUsuario se tornaria um endpoint para "criar perfil complementar" após o usuário ser criado no Keycloak ou para registrar um usuário no Keycloak e depois no seu DB.
-
-Ação Imediata para Desenvolvimento: Por simplicidade no desenvolvimento, se a ideia é ter usuários no seu DB local para o seu sistema de permissões, você precisa de uma forma de criar/sincronizar usuários do Keycloak para o seu DB local, ou remover o [AllowAnonymous] do RegisterUsuario e fazer com que ele só possa ser chamado por um "admin" que já exista no Keycloak e esteja sincronizando usuários.
-
-Considerando que você tem UsuarioPerfil, Perfil, Permissao, a sua intenção é gerenciar a autorização (quem pode acessar o quê) no seu DB local, o que é uma prática comum. O ponto de fricção é a tabela Usuario duplicada.
-
-RegisterUsuario Endpoint ([AllowAnonymous] vs. [Authorize(Roles = "admin")]):
-
-Você colocou um comentário sobre a opção de [AllowAnonymous] ou [Authorize(Roles = "admin")].
-
-Sugestão: Para um serviço de autenticação que usa Keycloak, o registro de novos usuários geralmente é feito no Keycloak. O RegisterUsuario na sua API deveria, na maioria dos cenários, ser um endpoint protegido por [Authorize(Roles = "admin")] para que apenas administradores possam criar entradas de usuário no seu banco de dados local, possivelmente vinculando-as a IDs de usuários existentes no Keycloak. Se você quer um registro público, ele deveria interagir diretamente com a API de registro do Keycloak, e então, um webhook do Keycloak (ou um processo de sincronização) criaria a entrada correspondente no seu banco de dados local.
 -
 
 

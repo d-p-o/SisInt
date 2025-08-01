@@ -2,7 +2,9 @@
 
 ---
 
-O **SisInt** será um **ERP (Enterprise Resource Planning)** moderno, desenvolvido do zero com uma **arquitetura de microsserviços** robusta. Sua concepção visa **flexibilidade, escalabilidade e resiliência**, características essenciais para ambientes de negócios complexos.
+O **SisInt** será um **ERP (Enterprise Resource Planning)** moderno, desenvolvido do zero com uma **arquitetura de microsserviços** robusta.
+ Sua concepção visa **flexibilidade, escalabilidade e resiliência**, características essenciais para ambientes de negócios complexos.
+  Porém inicialmente ele é um projeto **protótipo**, com o objetivo de **aprendizagem prática**.
 
 ---
 
@@ -80,9 +82,9 @@ Os seguintes serviços estão configurados e podem ser acessados após levantar 
 * `POST http://localhost:8080/realms/sisint-realm/protocol/openid-connect/token`: **OK** (Obtenção de Token Keycloak)
 * `GET http://localhost:5000/TestAuth/public`: **OK** (Acesso a Endpoint Público)
 * `GET http://localhost:5000/TestAuth`: **OK** (Acesso a Endpoint Protegido)
-* `POST http://localhost:5000/api/Usuario`: **OK** (Registro de Usuário)
-* `GET http://localhost:5000/api/Usuario`: **OK** (Listagem de Usuários)
-* `GET http://localhost:5000/api/Usuario/{usuario_id}`: **OK** (Obtenção de Usuário por ID)
+* `POST http://localhost:5000/api/Usuario`: **JOB** (Registro de Usuário)
+* `GET http://localhost:5000/api/Usuario`: **JOB** (Listagem de Usuários)
+* `GET http://localhost:5000/api/Usuario/{usuario_id}`: **JOB** (Obtenção de Usuário por ID)
 
 ---
 
@@ -91,10 +93,10 @@ Os seguintes serviços estão configurados e podem ser acessados após levantar 
 O roadmap do SisInt foca na integração e configuração de componentes essenciais para a sua funcionalidade completa:
 
 * **Integração de Segurança:** Estabelecer a comunicação completa e segura entre **Keycloak, Front-end e Back-end**.
-* **Testes Automatizados:** Implementar **xUnit** para testes unitários/integrados no Back-end e **Vitest** para o Front-end.
 * **API Gateway:** Configurar e implantar o **Kong** como o ponto de entrada central para todos os microsserviços.
 * **Integração de Mensageria:** Aprofundar a integração com **RabbitMQ** para comunicação assíncrona.
 * **Comunicação em Tempo Real:** Incorporar o **SignalR** para funcionalidades interativas e atualizações instantâneas.
+* **Testes Automatizados:** Implementar **xUnit** para testes unitários/integrados no Back-end e **Vitest** para o Front-end.
 * **NoSQL:** Integrar o **MongoDB** para necessidades específicas de armazenamento.
 
 O SisInt avança como um futuro ERP robusto e eficiente, com uma base tecnológica sólida e um plano claro para sua evolução.

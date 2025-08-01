@@ -2,7 +2,7 @@
 {
     public class UsuarioPerfil
     {
-        public Guid UsuarioId { get; set; }
+        public required string UsuarioId { get; set; }
         public required Usuario Usuario { get; set; }
 
         public int PerfilId { get; set; }

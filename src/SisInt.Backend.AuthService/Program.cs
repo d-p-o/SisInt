@@ -20,7 +20,6 @@ builder.Services.AddAuthentication(options =>
 .AddJwtBearer(options =>
 {
     options.Authority = builder.Configuration["Keycloak:Authority"];
-
     options.Audience = builder.Configuration["Keycloak:Audience"];
 
     options.TokenValidationParameters = new TokenValidationParameters
@@ -28,41 +27,18 @@ builder.Services.AddAuthentication(options =>
         ValidateAudience = true,
         ValidateLifetime = true,
         ValidateIssuerSigningKey = true,
-
         ClockSkew = TimeSpan.Zero,
-
         ValidateIssuer = true,
-
         ValidIssuers = ["http://keycloak:8080/realms/sisint-realm"],
-
-        NameClaimType = "preferred_username", // ou "name" se preferir
-
-        RoleClaimType = "realm_access.roles" // ajuste para "resource_access.sisint-auth-service.roles" se necessário
+        NameClaimType = "preferred_username",
+        RoleClaimType = "realm_access.roles"
     };
 
     options.RequireHttpsMetadata = false;
-
-    options.Events = new JwtBearerEvents
-    {
-        OnAuthenticationFailed = context =>
-        {
-            Console.WriteLine($"Authentication failed: {context.Exception.Message}");
-            return Task.CompletedTask;
-        },
-        OnTokenValidated = context =>
-        {
-            Console.WriteLine("Token successfully validated!");
-            return Task.CompletedTask;
-        },
-        OnMessageReceived = context =>
-        {
-            return Task.CompletedTask;
-        }
-    };
+    options.MapInboundClaims = false;
 });
 
 builder.Services.AddAuthorization();
-
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
@@ -77,14 +53,24 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    try
+    var maxRetries = 10;
+    var currentRetry = 0;
+
+    while (currentRetry < maxRetries)
     {
-        dbContext.Database.Migrate();
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"Erro ao executar Migrate(): {ex.Message}\n{ex.StackTrace}");
-        // Aqui você pode adicionar log para arquivo ou sistema de monitoramento
+        try
+        {
+            Console.WriteLine("Tentando aplicar as migrações...");
+            dbContext.Database.Migrate();
+            Console.WriteLine("Migrações aplicadas com sucesso.");
+            break;
+        }
+        catch (Exception ex)
+        {
+            currentRetry++;
+            Console.WriteLine($"Erro ao aplicar migrações. Tentativa {currentRetry}/{maxRetries}. Erro: {ex.Message}");
+            Thread.Sleep(3000);
+        }
     }
 }
 
@@ -95,10 +81,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseRouting();
-
 app.UseAuthentication();
 app.UseAuthorization();
-
 app.MapControllers();
-
 app.Run();
